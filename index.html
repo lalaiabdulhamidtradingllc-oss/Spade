@@ -6,97 +6,89 @@
 <title>AI Spades</title>
 
 <style>
-:root {
-  --felt-green:#006400;
-  --dark-wood:#4a2c2a;
-  --light-wood:#5a3c3a;
-  --card-bg:#f8f8f8;
-  --card-border:#ccc;
-  --text-light:#fff;
-  --text-dark:#222;
-  --accent-gold:#ffeb3b;
-}
-
-/* RESET */
-*{box-sizing:border-box;margin:0;padding:0}
+/* ===== BASIC RESET ===== */
+*{margin:0;padding:0;box-sizing:border-box}
 html,body{
   width:100%;
   height:100%;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
-  background:var(--felt-green);
-  color:white;
+  background:#064f2c;
+  color:#fff;
   overflow:hidden;
 }
 
-.game-container{
+/* ===== LANDSCAPE LOCK ===== */
+#rotate-warning{
+  position:fixed;
+  inset:0;
+  background:#000;
+  color:#fff;
+  display:none;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  font-size:1.2rem;
+  z-index:999;
+}
+
+@media (orientation:portrait){
+  #rotate-warning{display:flex}
+  #game{display:none}
+}
+
+/* ===== GAME LAYOUT ===== */
+#game{
+  width:100%;
   height:100%;
   display:flex;
   flex-direction:column;
 }
 
-/* TABS */
-.tabs{
-  display:flex;
-  background:var(--dark-wood);
-}
-.tab-button{
+#table{
   flex:1;
-  padding:10px;
-  background:none;
-  border:none;
-  color:white;
-  font-weight:bold;
+  position:relative;
 }
-.tab-button.active{
-  background:var(--light-wood);
-  border-bottom:3px solid var(--accent-gold);
-}
-.tab-content{display:none;flex:1;padding:8px;overflow:auto}
-.tab-content.active{display:block}
 
-/* PLAY AREA */
-#play-area{position:relative;height:100%}
-
-.player-area{
+/* Players */
+.player{
   position:absolute;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
+  text-align:center;
 }
 
-#player-area-A{bottom:0;width:100%}
-#player-area-C{top:0;width:100%}
-#player-area-B{left:0;top:50%;transform:translateY(-50%)}
-#player-area-D{right:0;top:50%;transform:translateY(-50%)}
+#A{bottom:0;left:0;right:0}
+#C{top:0;left:0;right:0}
+#B{left:0;top:50%;transform:translateY(-50%)}
+#D{right:0;top:50%;transform:translateY(-50%)}
 
-.player-info{
-  background:rgba(0,0,0,.5);
-  padding:4px 8px;
-  border-radius:6px;
+.name{
   font-size:.8rem;
   margin-bottom:4px;
 }
 
-.hand{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}
-
-.card,.card-back{
-  width:38px;
-  height:54px;
-  border-radius:6px;
-  background:#f8f8f8;
-  color:#000;
+.hand{
   display:flex;
   justify-content:center;
+  gap:2px;
+  flex-wrap:wrap;
+}
+
+/* Cards */
+.card,.back{
+  width:36px;
+  height:50px;
+  border-radius:6px;
+  background:#fff;
+  color:#000;
+  display:flex;
   align-items:center;
+  justify-content:center;
   font-weight:bold;
-  border:1px solid #ccc;
 }
 
-.card-back{
-  background:#ccc;
-}
+.back{background:#ccc}
 
-#trick-area{
+/* Trick */
+#trick{
   position:absolute;
   top:50%;
   left:50%;
@@ -105,132 +97,145 @@ html,body{
   gap:6px;
 }
 
-#game-status-area{
-  position:absolute;
-  bottom:70px;
-  left:6px;
-  right:6px;
-  background:rgba(0,0,0,.7);
+/* Bottom bar */
+#status{
+  background:rgba(0,0,0,.6);
   padding:6px;
-  border-radius:8px;
   font-size:.8rem;
 }
 
-#chat-log{
-  height:45px;
+#chat{
+  height:40px;
   overflow:auto;
-  font-size:.75rem;
-  margin-bottom:4px;
 }
 
 button{
-  background:var(--dark-wood);
-  color:white;
+  padding:6px 10px;
   border:none;
-  padding:6px 8px;
   border-radius:6px;
-  font-size:.85rem;
+  background:#3e2a20;
+  color:#fff;
 }
 
-#bid-input{width:40px}
-
-#game-over-screen{
-  position:absolute;
+/* Game Over */
+#gameover{
+  position:fixed;
   inset:0;
   background:rgba(0,0,0,.85);
   display:none;
   justify-content:center;
   align-items:center;
   flex-direction:column;
-}
-
-/* SCORE & RULES */
-#score-table,#rules-content{
-  background:var(--light-wood);
-  padding:12px;
-  border-radius:10px;
-}
-
-/* MOBILE EXTRA SAFE */
-@media(max-width:480px){
-  .card,.card-back{width:34px;height:48px}
-  #trick-area .card{width:40px;height:56px}
-  #player-area-B,#player-area-D{width:60px}
+  z-index:10;
 }
 </style>
 </head>
 
 <body>
 
-<div class="game-container">
+<div id="rotate-warning">
+  Rotate your phone sideways 📱
+</div>
 
-<nav class="tabs">
-  <button class="tab-button active" onclick="switchTab('play')">Play</button>
-  <button class="tab-button" onclick="switchTab('score')">Score</button>
-  <button class="tab-button" onclick="switchTab('rules')">Rules</button>
-</nav>
+<div id="game">
 
-<main>
+<div id="table">
 
-<div id="play" class="tab-content active">
-  <div id="play-area">
+  <div id="A" class="player">
+    <div class="name">YOU</div>
+    <div id="handA" class="hand"></div>
+  </div>
 
-    <div id="player-area-A" class="player-area">
-      <div class="player-info">You</div>
-      <div class="hand"></div>
-    </div>
+  <div id="B" class="player">
+    <div class="name">B</div>
+    <div id="handB" class="hand"></div>
+  </div>
 
-    <div id="player-area-B" class="player-area">
-      <div class="player-info">B</div>
-      <div class="hand"></div>
-    </div>
+  <div id="C" class="player">
+    <div class="name">PARTNER</div>
+    <div id="handC" class="hand"></div>
+  </div>
 
-    <div id="player-area-C" class="player-area">
-      <div class="player-info">Partner</div>
-      <div class="hand"></div>
-    </div>
+  <div id="D" class="player">
+    <div class="name">D</div>
+    <div id="handD" class="hand"></div>
+  </div>
 
-    <div id="player-area-D" class="player-area">
-      <div class="player-info">D</div>
-      <div class="hand"></div>
-    </div>
+  <div id="trick"></div>
 
-    <div id="trick-area"></div>
+</div>
 
-    <div id="game-status-area">
-      <div id="chat-log"></div>
-      <div>
-        Bid:
-        <input id="bid-input" type="number" min="0" max="13" value="1">
-        <button>Submit</button>
-      </div>
-    </div>
-
-    <div id="game-over-screen">
-      <h2>You Win</h2>
-      <button onclick="location.reload()">New Game</button>
-    </div>
-
+<div id="status">
+  <div id="chat"></div>
+  <div id="bid-area">
+    Bid:
+    <input id="bid" type="number" min="0" max="13" value="3">
+    <button onclick="submitBid()">OK</button>
   </div>
 </div>
 
-<div id="score" class="tab-content">
-  <div id="score-table">Score screen</div>
 </div>
 
-<div id="rules" class="tab-content">
-  <div id="rules-content">Rules screen</div>
-</div>
-
-</main>
+<div id="gameover">
+  <h2 id="result"></h2>
+  <button onclick="location.reload()">New Game</button>
 </div>
 
 <script>
-function switchTab(tab){
-  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'))
-  document.querySelectorAll('.tab-button').forEach(b=>b.classList.remove('active'))
-  document.getElementById(tab).classList.add('active')
-  event.target.classList.add('active')
+/* ===== GAME DATA ===== */
+const suits=["♠","♥","♦","♣"];
+const ranks=[2,3,4,5,6,7,8,9,10,"J","Q","K","A"];
+let deck=[],hands={},turn="A",phase="bid",trick=[],scores={AC:0};
+
+/* ===== SETUP ===== */
+function start(){
+  deck=[];
+  suits.forEach(s=>ranks.forEach(r=>deck.push(r+s)));
+  deck.sort(()=>Math.random()-0.5);
+  hands={A:[],B:[],C:[],D:[]};
+  deck.forEach((c,i)=>hands[["A","B","C","D"][i%4]].push(c));
+  render();
+}
+start();
+
+/* ===== RENDER ===== */
+function render(){
+  ["A","B","C","D"].forEach(p=>{
+    const el=document.getElementById("hand"+p);
+    el.innerHTML="";
+    hands[p].forEach(c=>{
+      const d=document.createElement("div");
+      d.className=p==="A"?"card":"back";
+      d.innerText=p==="A"?c:"";
+      if(p==="A"&&phase==="play"){
+        d.onclick=()=>play(c);
+      }
+      el.appendChild(d);
+    });
+  });
+}
+
+/* ===== BIDDING ===== */
+function submitBid(){
+  phase="play";
+  log("Play started");
+}
+
+/* ===== PLAY ===== */
+function play(card){
+  hands.A=hands.A.filter(c=>c!==card);
+  trick.push(card);
+  if(trick.length===4){
+    trick=[];
+  }
+  render();
+}
+
+/* ===== CHAT ===== */
+function log(t){
+  const c=document.getElementById("chat");
+  c.innerHTML+=t+"<br>";
+  c.scrollTop=c.scrollHeight;
 }
 </script>
 
