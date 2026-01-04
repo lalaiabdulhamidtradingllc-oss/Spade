@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spades – Working</title>
+<title>Spades – Base Working</title>
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{
   width:100%;
   height:100%;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
   background:#0b5a2a;
+  font-family:-apple-system,BlinkMacSystemFont,Segoe UI;
   color:#fff;
   overflow:hidden;
 }
@@ -23,40 +23,41 @@ html,body{
   height:100%;
 }
 
-/* PLAYERS */
+/* PLAYER POSITIONS */
 .player{
   position:absolute;
   text-align:center;
 }
-#C{top:10px;left:0;right:0}
-#A{bottom:10px;left:0;right:0}
-#B{left:5px;top:50%;transform:translateY(-50%)}
-#D{right:5px;top:50%;transform:translateY(-50%)}
+
+#playerC{top:10px;left:50%;transform:translateX(-50%)}
+#playerA{bottom:10px;left:50%;transform:translateX(-50%)}
+#playerB{left:10px;top:50%;transform:translateY(-50%)}
+#playerD{right:10px;top:50%;transform:translateY(-50%)}
 
 .name{
   font-size:.8rem;
   margin-bottom:4px;
 }
 
-/* HAND */
+/* HANDS */
 .hand{
   display:flex;
-  justify-content:center;
   gap:4px;
   flex-wrap:wrap;
+  justify-content:center;
 }
 
-/* CARD */
+/* CARDS */
 .card,.back{
   width:38px;
   height:54px;
   border-radius:6px;
   background:#fff;
   border:1px solid #ccc;
+  font-weight:bold;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-weight:bold;
   font-size:.8rem;
 }
 
@@ -64,22 +65,22 @@ html,body{
 .black{color:#000}
 .back{background:#ccc}
 
-/* TRICK */
+/* TRICK AREA */
 #trick{
   position:absolute;
   top:50%;
   left:50%;
   transform:translate(-50%,-50%);
   display:flex;
-  gap:8px;
+  gap:10px;
 }
 
 /* STATUS */
 #status{
   position:absolute;
-  bottom:70px;
-  left:5px;
-  right:5px;
+  bottom:80px;
+  left:10px;
+  right:10px;
   background:rgba(0,0,0,.6);
   padding:6px;
   font-size:.8rem;
@@ -91,7 +92,6 @@ html,body{
 }
 
 button{
-  margin-top:4px;
   padding:6px 10px;
   border:none;
   border-radius:6px;
@@ -107,22 +107,22 @@ input{width:40px}
 
 <div id="table">
 
-  <div id="C" class="player">
+  <div id="playerC" class="player">
     <div class="name">PARTNER</div>
     <div id="handC" class="hand"></div>
   </div>
 
-  <div id="B" class="player">
+  <div id="playerB" class="player">
     <div class="name">B</div>
     <div id="handB" class="hand"></div>
   </div>
 
-  <div id="D" class="player">
+  <div id="playerD" class="player">
     <div class="name">D</div>
     <div id="handD" class="hand"></div>
   </div>
 
-  <div id="A" class="player">
+  <div id="playerA" class="player">
     <div class="name">YOU</div>
     <div id="handA" class="hand"></div>
   </div>
@@ -149,7 +149,7 @@ const suitOrder={"♠":1,"♦":2,"♣":3,"♥":4};
 
 let hands={},deck=[],turn="A",phase="BID",trick=[];
 
-/* START */
+/* INIT */
 init();
 
 function init(){
@@ -198,29 +198,38 @@ function render(){
   t.innerHTML="";
   trick.forEach(o=>{
     const d=document.createElement("div");
-    d.className="card "+((o.card.includes("♥")||o.card.includes("♦"))?"red":"black");
-    d.innerText=o.card;
+    d.className="card "+((o.includes("♥")||o.includes("♦"))?"red":"black");
+    d.innerText=o;
     t.appendChild(d);
   });
 }
 
-/* BID → PLAY */
+/* START PLAY */
 function startPlay(){
   phase="PLAY";
   document.getElementById("bidArea").style.display="none";
-  log("Play started");
-  if(turn!=="A") aiTurn();
+  log("Play started – your turn");
 }
 
-/* PLAY CARD */
+/* PLAY */
 function playCard(card){
-  if(turn!=="A") return;
+  if(turn!=="A")return;
   hands.A=hands.A.filter(c=>c!==card);
-  trick.push({player:"A",card});
-  nextTurn();
+  trick.push(card);
+  turn="B";
+  render();
+  aiPlay();
 }
 
-/* NEXT TURN */
+/* AI PLAY */
+function aiPlay(){
+  setTimeout(()=>{
+    const card=hands[turn].shift();
+    trick.push(card);
+    nextTurn();
+  },600);
+}
+
 function nextTurn(){
   if(trick.length===4){
     trick=[];
@@ -230,17 +239,7 @@ function nextTurn(){
   }
   turn=players[(players.indexOf(turn)+1)%4];
   render();
-  if(turn!=="A") aiTurn();
-}
-
-/* AI */
-function aiTurn(){
-  setTimeout(()=>{
-    const card=hands[turn].shift();
-    trick.push({player:turn,card});
-    log("Player "+turn+" played");
-    nextTurn();
-  },700);
+  if(turn!=="A") aiPlay();
 }
 
 /* CHAT */
