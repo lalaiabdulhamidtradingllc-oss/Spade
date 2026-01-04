@@ -3,45 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Spades</title>
+<title>Spades – Phone Only</title>
 
 <style>
-/* ===== BASIC RESET ===== */
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{
   width:100%;
   height:100%;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
-  background:#064f2c;
+  background:#0b5a2a;
   color:#fff;
   overflow:hidden;
 }
 
-/* ===== LANDSCAPE LOCK ===== */
-#rotate-warning{
-  position:fixed;
-  inset:0;
-  background:#000;
-  color:#fff;
-  display:none;
-  justify-content:center;
-  align-items:center;
-  text-align:center;
-  font-size:1.2rem;
-  z-index:999;
-}
-
-@media (orientation:portrait){
-  #rotate-warning{display:flex}
-  #game{display:none}
-}
-
-/* ===== GAME LAYOUT ===== */
+/* Layout */
 #game{
-  width:100%;
-  height:100%;
   display:flex;
   flex-direction:column;
+  height:100%;
 }
 
 #table{
@@ -68,20 +47,20 @@ html,body{
 .hand{
   display:flex;
   justify-content:center;
-  gap:2px;
+  gap:3px;
   flex-wrap:wrap;
 }
 
 /* Cards */
 .card,.back{
-  width:36px;
-  height:50px;
+  width:38px;
+  height:54px;
   border-radius:6px;
   background:#fff;
   color:#000;
   display:flex;
-  align-items:center;
   justify-content:center;
+  align-items:center;
   font-weight:bold;
 }
 
@@ -105,8 +84,9 @@ html,body{
 }
 
 #chat{
-  height:40px;
+  height:45px;
   overflow:auto;
+  margin-bottom:4px;
 }
 
 button{
@@ -117,33 +97,26 @@ button{
   color:#fff;
 }
 
-/* Game Over */
-#gameover{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.85);
-  display:none;
-  justify-content:center;
-  align-items:center;
-  flex-direction:column;
-  z-index:10;
+input{
+  width:40px;
+}
+
+/* Mobile safe */
+@media(max-width:480px){
+  .card,.back{width:34px;height:48px}
 }
 </style>
 </head>
 
 <body>
 
-<div id="rotate-warning">
-  Rotate your phone sideways 📱
-</div>
-
 <div id="game">
 
 <div id="table">
 
-  <div id="A" class="player">
-    <div class="name">YOU</div>
-    <div id="handA" class="hand"></div>
+  <div id="C" class="player">
+    <div class="name">PARTNER</div>
+    <div id="handC" class="hand"></div>
   </div>
 
   <div id="B" class="player">
@@ -151,14 +124,14 @@ button{
     <div id="handB" class="hand"></div>
   </div>
 
-  <div id="C" class="player">
-    <div class="name">PARTNER</div>
-    <div id="handC" class="hand"></div>
-  </div>
-
   <div id="D" class="player">
     <div class="name">D</div>
     <div id="handD" class="hand"></div>
+  </div>
+
+  <div id="A" class="player">
+    <div class="name">YOU</div>
+    <div id="handA" class="hand"></div>
   </div>
 
   <div id="trick"></div>
@@ -167,7 +140,7 @@ button{
 
 <div id="status">
   <div id="chat"></div>
-  <div id="bid-area">
+  <div id="bidArea">
     Bid:
     <input id="bid" type="number" min="0" max="13" value="3">
     <button onclick="submitBid()">OK</button>
@@ -176,65 +149,89 @@ button{
 
 </div>
 
-<div id="gameover">
-  <h2 id="result"></h2>
-  <button onclick="location.reload()">New Game</button>
-</div>
-
 <script>
-/* ===== GAME DATA ===== */
+/* ===== DATA ===== */
 const suits=["♠","♥","♦","♣"];
-const ranks=[2,3,4,5,6,7,8,9,10,"J","Q","K","A"];
-let deck=[],hands={},turn="A",phase="bid",trick=[],scores={AC:0};
+const ranks=["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+const players=["A","B","C","D"];
+let hands={},deck=[],turn="A",phase="BID",trick=[];
 
-/* ===== SETUP ===== */
-function start(){
+/* ===== START ===== */
+startGame();
+
+function startGame(){
   deck=[];
   suits.forEach(s=>ranks.forEach(r=>deck.push(r+s)));
   deck.sort(()=>Math.random()-0.5);
+
   hands={A:[],B:[],C:[],D:[]};
-  deck.forEach((c,i)=>hands[["A","B","C","D"][i%4]].push(c));
+  deck.forEach((c,i)=>hands[players[i%4]].push(c));
+
+  log("Place your bid");
   render();
 }
-start();
 
 /* ===== RENDER ===== */
 function render(){
-  ["A","B","C","D"].forEach(p=>{
+  players.forEach(p=>{
     const el=document.getElementById("hand"+p);
     el.innerHTML="";
-    hands[p].forEach(c=>{
+    hands[p].forEach(card=>{
       const d=document.createElement("div");
       d.className=p==="A"?"card":"back";
-      d.innerText=p==="A"?c:"";
-      if(p==="A"&&phase==="play"){
-        d.onclick=()=>play(c);
+      d.innerText=p==="A"?card:"";
+      if(p==="A" && phase==="PLAY"){
+        d.onclick=()=>playCard(card);
       }
       el.appendChild(d);
     });
   });
 }
 
-/* ===== BIDDING ===== */
+/* ===== BID ===== */
 function submitBid(){
-  phase="play";
+  phase="PLAY";
+  document.getElementById("bidArea").style.display="none";
   log("Play started");
+  if(turn!=="A") aiTurn();
 }
 
 /* ===== PLAY ===== */
-function play(card){
+function playCard(card){
+  if(turn!=="A") return;
   hands.A=hands.A.filter(c=>c!==card);
-  trick.push(card);
+  trick.push({p:"A",c:card});
+  nextTurn();
+}
+
+function nextTurn(){
   if(trick.length===4){
     trick=[];
+    log("New trick");
+    turn="A";
+    render();
+    return;
   }
-  render();
+
+  turn=players[(players.indexOf(turn)+1)%4];
+  if(turn!=="A") aiTurn();
+}
+
+/* ===== AI ===== */
+function aiTurn(){
+  setTimeout(()=>{
+    const card=hands[turn].pop();
+    trick.push({p:turn,c:card});
+    log("Player "+turn+" played");
+    nextTurn();
+    render();
+  },600);
 }
 
 /* ===== CHAT ===== */
-function log(t){
+function log(text){
   const c=document.getElementById("chat");
-  c.innerHTML+=t+"<br>";
+  c.innerHTML+=text+"<br>";
   c.scrollTop=c.scrollHeight;
 }
 </script>
