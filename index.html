@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spades – Base Working</title>
+<title>Spades – iPhone Stable</title>
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -23,16 +23,17 @@ html,body{
   height:100%;
 }
 
-/* PLAYER POSITIONS */
+/* PLAYERS */
 .player{
   position:absolute;
   text-align:center;
+  width:100%;
 }
 
-#playerC{top:10px;left:50%;transform:translateX(-50%)}
-#playerA{bottom:10px;left:50%;transform:translateX(-50%)}
-#playerB{left:10px;top:50%;transform:translateY(-50%)}
-#playerD{right:10px;top:50%;transform:translateY(-50%)}
+#playerC{top:10px}
+#playerA{bottom:10px}
+#playerB{left:0;top:50%;width:70px;transform:translateY(-50%)}
+#playerD{right:0;top:50%;width:70px;transform:translateY(-50%)}
 
 .name{
   font-size:.8rem;
@@ -42,15 +43,21 @@ html,body{
 /* HANDS */
 .hand{
   display:flex;
-  gap:4px;
-  flex-wrap:wrap;
   justify-content:center;
+  gap:4px;
+  flex-wrap:nowrap;   /* IMPORTANT: no wrap */
+  overflow:hidden;
+}
+
+#playerB .hand,
+#playerD .hand{
+  flex-direction:column;
 }
 
 /* CARDS */
 .card,.back{
-  width:38px;
-  height:54px;
+  width:36px;
+  height:50px;
   border-radius:6px;
   background:#fff;
   border:1px solid #ccc;
@@ -65,7 +72,7 @@ html,body{
 .black{color:#000}
 .back{background:#ccc}
 
-/* TRICK AREA */
+/* TRICK */
 #trick{
   position:absolute;
   top:50%;
@@ -81,13 +88,13 @@ html,body{
   bottom:80px;
   left:10px;
   right:10px;
-  background:rgba(0,0,0,.6);
+  background:rgba(0,0,0,.65);
   padding:6px;
   font-size:.8rem;
 }
 
 #chat{
-  height:40px;
+  height:38px;
   overflow:auto;
 }
 
@@ -99,7 +106,7 @@ button{
   color:#fff;
 }
 
-input{width:40px}
+input{width:42px}
 </style>
 </head>
 
@@ -141,7 +148,6 @@ input{width:40px}
 </div>
 
 <script>
-/* DATA */
 const players=["A","B","C","D"];
 const suits=["♠","♦","♣","♥"];
 const ranks=["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
@@ -159,13 +165,11 @@ function init(){
 
   hands={A:[],B:[],C:[],D:[]};
   deck.forEach((c,i)=>hands[players[i%4]].push(c));
-
   sortHand(hands.A);
   render();
   log("Place your bid");
 }
 
-/* SORT */
 function sortHand(hand){
   hand.sort((a,b)=>{
     if(suitOrder[a.slice(-1)]!==suitOrder[b.slice(-1)])
@@ -174,7 +178,6 @@ function sortHand(hand){
   });
 }
 
-/* RENDER */
 function render(){
   players.forEach(p=>{
     const el=document.getElementById("hand"+p);
@@ -196,22 +199,20 @@ function render(){
 
   const t=document.getElementById("trick");
   t.innerHTML="";
-  trick.forEach(o=>{
+  trick.forEach(c=>{
     const d=document.createElement("div");
-    d.className="card "+((o.includes("♥")||o.includes("♦"))?"red":"black");
-    d.innerText=o;
+    d.className="card "+((c.includes("♥")||c.includes("♦"))?"red":"black");
+    d.innerText=c;
     t.appendChild(d);
   });
 }
 
-/* START PLAY */
 function startPlay(){
   phase="PLAY";
   document.getElementById("bidArea").style.display="none";
   log("Play started – your turn");
 }
 
-/* PLAY */
 function playCard(card){
   if(turn!=="A")return;
   hands.A=hands.A.filter(c=>c!==card);
@@ -221,7 +222,6 @@ function playCard(card){
   aiPlay();
 }
 
-/* AI PLAY */
 function aiPlay(){
   setTimeout(()=>{
     const card=hands[turn].shift();
@@ -242,7 +242,6 @@ function nextTurn(){
   if(turn!=="A") aiPlay();
 }
 
-/* CHAT */
 function log(text){
   const c=document.getElementById("chat");
   c.innerHTML+=text+"<br>";
