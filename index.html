@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Spades (Single-File)</title>
+  <style>
+    :root { font-family: -apple-system, system-ui, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; background:#0b1320; color:#e9eef7; }
+    header { padding: 14px 16px; display:flex; gap:12px; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,.08); }
+    header h1 { font-size: 16px; margin:0; font-weight: 700; letter-spacing:.2px; }
+    header .btns { display:flex; gap:8px; flex-wrap:wrap; }
+    button { background:#1b2a44; color:#e9eef7; border:1px solid rgba(255,255,255,.12); padding:10px 12px; border-radius:10px; cursor:pointer; }
+    button:hover { background:#203457; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 14px; display:grid; gap:12px; grid-template-columns: 1fr 320px; }
+    @media (max-width: 980px) { .wrap { grid-template-columns: 1fr; } }
+
+    .table {
+      background: radial-gradient(1200px 600px at 50% 40%, #14325c, #08101d);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 16px;
+      min-height: 520px;
+      position: relative;
+      overflow:hidden;
+      padding: 12px;
+    }
+
+    .seat { position:absolute; display:flex; align-items:center; gap:10px; }
+    .seat .name { font-weight:700; font-size:13px; opacity:.9; }
+    .seat .meta { font-size:12px; opacity:.8; }
+    .seat .pill { background: rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.10); padding:6px 8px; border-radius: 999px; }
+
+    .north { top:10px; left:50%; transform:translateX(-50%); }
+    .south { bottom:10px; left:50%; transform:translateX(-50%); flex-direction:column; gap:6px; }
+    .west  { left:10px; top:50%; transform:translateY(-50%); flex-direction:column; gap:6px; }
+    .east  { right:10px; top:50%; transform:translateY(-50%); flex-direction:column; gap:6px; }
+
+    .center {
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      width:min(520px, 92%); height: 240px;
+      display:grid; place-items:center;
+    }
+    .trick {
+      display:grid; grid-template-columns: 1fr 1fr; gap:10px;
+      width:100%; height:100%;
+      align-items:center;
+    }
+    .slot { display:flex; flex-direction:column; gap:6px; align-items:center; justify-content:center; }
+    .slot .label { font-size:12px; opacity:.75; }
+    .card {
+      width: 74px; height: 104px;
+      border-radius: 12px;
+      background: #f7f9ff;
+      color: #0b1320;
+      border: 2px solid rgba(255,255,255,.0);
+      box-shadow: 0 8px 20px rgba(0,0,0,.35);
+      display:flex; flex-direction:column; justify-content:space-between;
+      padding: 10px;
+      user-select:none;
+    }
+    .card.red { color:#b3122e; }
+    .card.back {
+      background: linear-gradient(135deg, #223a66, #132443);
+      color:#e9eef7;
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow: 0 8px 20px rgba(0,0,0,.35);
+    }
+    .card .r1 { font-weight:800; font-size:16px; }
+    .card .mid { font-size:28px; text-align:center; opacity:.95; }
+    .card .r2 { font-weight:800; font-size:16px; text-align:right; }
+
+    .hand {
+      display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+      padding: 10px;
+      background: rgba(0,0,0,.20);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    .hand .hcard { cursor:pointer; transition: transform .08s ease, box-shadow .08s ease; }
+    .hand .hcard:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,.42); }
+    .hand .hcard.illegal { opacity:.35; cursor:not-allowed; transform:none; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
+    .hand .hcard.selected { outline: 3px solid rgba(255,255,255,.55); }
+
+    .side {
+      background:#0f1b2f;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 16px;
+      padding: 12px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .panel { background: rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 10px; }
+    .panel h2 { margin:0 0 8px 0; font-size:13px; letter-spacing:.2px; opacity:.9; }
+    .row { display:flex; justify-content:space-between; gap:10px; padding: 6px 0; border-bottom:1px dashed rgba(255,255,255,.10); font-size:13px; }
+    .row:last-child { border-bottom:0; }
+    .muted { opacity:.75; }
+
+    .turn {
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.10);
+      padding:10px; border-radius: 14px;
+    }
+    .turn strong { font-size: 13px; }
+    .log { max-height: 210px; overflow:auto; font-size:12px; line-height:1.35; }
+    .log div { padding: 6px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+    .log div:last-child { border-bottom:0; }
+
+    .bidUI { display:flex; flex-direction:column; gap:10px; }
+    select, input[type="checkbox"] { transform: scale(1.1); }
+    .bidRow { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .small { font-size:12px; opacity:.85; }
+    .hint { font-size:12px; opacity:.8; line-height:1.35; }
+    .badge { font-size:11px; padding: 4px 8px; border-radius: 999px; border:1px solid rgba(255,255,255,.16); background: rgba(0,0,0,.18); }
+  </style>
+</head>
+<body>
+<header>
+  <h1>♠️ Spades (Single-File Web Game)</h1>
+  <div class="btns">
+    <button id="newBtn">New Game</button>
+    <button id="dealBtn">Deal</button>
+    <button id="autoPlayBtn">Auto-play Round</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="table" id="table">
+    <!-- Seats -->
+    <div class="seat north">
+      <div class="pill">
+        <div class="name">NORTH (AI)</div>
+        <div class="meta"><span id="nBid">Bid: -</span> • <span id="nTricks">Tricks: 0</span></div>
+      </div>
+      <div class="card back" title="AI hand size">
+        <div class="r1">🂠</div><div class="mid" id="nCount">0</div><div class="r2">🂠</div>
+      </div>
+    </div>
+
+    <div class="seat west">
+      <div class="pill">
+        <div class="name">WEST (AI)</div>
+        <div class="meta"><span id="wBid">Bid: -</span> • <span id="wTricks">Tricks: 0</span></div>
+      </div>
+      <div class="card back"><div class="r1">🂠</div><div class="mid" id="wCount">0</div><div class="r2">🂠</div></div>
+    </div>
+
+    <div class="seat east">
+      <div class="pill">
+        <div class="name">EAST (AI)</div>
+        <div class="meta"><span id="eBid">Bid: -</span> • <span id="eTricks">Tricks: 0</span></div>
+      </div>
+      <div class="card back"><div class="r1">🂠</div><div class="mid" id="eCount">0</div><div class="r2">🂠</div></div>
+    </div>
+
+    <div class="seat south">
+      <div class="pill">
+        <div class="name">SOUTH (YOU)</div>
+        <div class="meta"><span id="sBid">Bid: -</span> • <span id="sTricks">Tricks: 0</span></div>
+      </div>
+      <div class="badge" id="spadesState">Spades not broken</div>
+    </div>
+
+    <!-- Trick center -->
+    <div class="center">
+      <div class="trick">
+        <div class="slot">
+          <div class="label">NORTH played</div>
+          <div id="slotN"></div>
+        </div>
+        <div class="slot">
+          <div class="label">EAST played</div>
+          <div id="slotE"></div>
+        </div>
+        <div class="slot">
+          <div class="label">WEST played</div>
+          <div id="slotW"></div>
+        </div>
+        <div class="slot">
+          <div class="label">SOUTH played</div>
+          <div id="slotS"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="side">
+    <div class="turn">
+      <div>
+        <strong>State:</strong> <span id="stateText" class="muted">Press Deal to start</span>
+      </div>
+      <div class="badge" id="turnText">Turn: -</div>
+    </div>
+
+    <div class="panel">
+      <h2>Score</h2>
+      <div class="row"><span>Team NS (North+South)</span><span><b id="scoreNS">0</b> <span class="muted">bags</span> <span id="bagsNS">0</span></span></div>
+      <div class="row"><span>Team EW (East+West)</span><span><b id="scoreEW">0</b> <span class="muted">bags</span> <span id="bagsEW">0</span></span></div>
+      <div class="row"><span>Round bids</span><span class="muted" id="teamBids">NS: - • EW: -</span></div>
+      <div class="row"><span>Round tricks</span><span class="muted" id="teamTricks">NS: 0 • EW: 0</span></div>
+    </div>
+
+    <div class="panel">
+      <h2>Your Bid</h2>
+      <div class="bidUI">
+        <div class="bidRow">
+          <label for="bidSelect">Bid tricks:</label>
+          <select id="bidSelect"></select>
+        </div>
+        <div class="bidRow">
+          <label for="nilCheck">Nil (0 tricks):</label>
+          <input type="checkbox" id="nilCheck" />
+        </div>
+        <button id="submitBidBtn">Submit Bid</button>
+        <div class="hint">
+          After you bid, AIs will bid automatically, then the round starts.
+          <div class="small">Rules: follow suit, spades trump, can’t lead spades until broken (unless you only have spades).</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Log</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </aside>
+</div>
+
+<div class="hand" id="hand"></div>
+
+<script>
+/* ===========================
+   Spades - Single File
+   You (South) vs 3 AIs
+   =========================== */
+
+const SUITS = ["S","H","D","C"]; // Spades, Hearts, Diamonds, Clubs
+const SUIT_SYM = {S:"♠", H:"♥", D:"♦", C:"♣"};
+const RANKS = [2,3,4,5,6,7,8,9,10,11,12,13,14]; // 11 J,12 Q,13 K,14 A
+const RANK_LABEL = r => (r<=10? String(r) : ({11:"J",12:"Q",13:"K",14:"A"}[r]));
+
+const PLAYERS = ["N","E","S","W"]; // clockwise
+const TEAM = { N:"NS", S:"NS", E:"EW", W:"EW" };
+
+let state = {
+  phase: "idle", // idle | bidding | playing | round_end
+  hands: {N:[],E:[],S:[],W:[]},
+  bids: {N:null,E:null,S:null,W:null},
+  nil:  {N:false,E:false,S:false,W:false},
+  tricks: {N:0,E:0,S:0,W:0},
+  teamScore: {NS:0, EW:0},
+  teamBags: {NS:0, EW:0},
+  spadesBroken: false,
+  leader: "S",
+  turn: "S",
+  trick: [], // [{p, card}]
+  trickNumber: 0
+};
+
+// UI
+const el = id => document.getElementById(id);
+const logEl = el("log");
+const handEl = el("hand");
+const slots = {N: el("slotN"), E: el("slotE"), S: el("slotS"), W: el("slotW")};
+
+const stateText = el("stateText");
+const turnText = el("turnText");
+const spadesState = el("spadesState");
+
+const bidSelect = el("bidSelect");
+const nilCheck = el("nilCheck");
+const submitBidBtn = el("submitBidBtn");
+
+const dealBtn = el("dealBtn");
+const newBtn = el("newBtn");
+const autoPlayBtn = el("autoPlayBtn");
+
+function pushLog(msg){
+  const d = document.createElement("div");
+  d.textContent = msg;
+  logEl.prepend(d);
+}
+
+// Build bid options
+for(let i=0;i<=13;i++){
+  const o = document.createElement("option");
+  o.value = i;
+  o.textContent = String(i);
+  bidSelect.appendChild(o);
+}
+bidSelect.value = "4";
+
+// Cards
+function makeDeck(){
+  const deck = [];
+  for(const s of SUITS){
+    for(const r of RANKS){
+      deck.push({s, r});
+    }
+  }
+  return deck;
+}
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+function cardKey(c){ return c.s + c.r; }
+
+function cardToText(c){ return `${RANK_LABEL(c.r)}${SUIT_SYM[c.s]}`; }
+function isRedSuit(s){ return s==="H" || s==="D"; }
+
+function renderCard(c, extraClass=""){
+  const div = document.createElement("div");
+  const red = isRedSuit(c.s) ? "red" : "";
+  div.className = `card ${red} ${extraClass}`.trim();
+
+  const r1 = document.createElement("div"); r1.className="r1"; r1.textContent = RANK_LABEL(c.r);
+  const mid= document.createElement("div"); mid.className="mid"; mid.textContent = SUIT_SYM[c.s];
+  const r2 = document.createElement("div"); r2.className="r2"; r2.textContent = RANK_LABEL(c.r);
+
+  div.appendChild(r1); div.appendChild(mid); div.appendChild(r2);
+  return div;
+}
+
+function clearTrickSlots(){
+  for(const p of PLAYERS) slots[p].innerHTML = "";
+}
+
+function updateTopUI(){
+  el("nCount").textContent = state.hands.N.length;
+  el("eCount").textContent = state.hands.E.length;
+  el("sTricks").textContent = "Tricks: " + state.tricks.S;
+  el("nTricks").textContent = "Tricks: " + state.tricks.N;
+  el("eTricks").textContent = "Tricks: " + state.tricks.E;
+  el("wTricks").textContent = "Tricks: " + state.tricks.W;
+  el("wCount").textContent = state.hands.W.length;
+
+  el("sBid").textContent = "Bid: " + (state.bids.S ?? "-") + (state.nil.S ? " (Nil)" : "");
+  el("nBid").textContent = "Bid: " + (state.bids.N ?? "-") + (state.nil.N ? " (Nil)" : "");
+  el("eBid").textContent = "Bid: " + (state.bids.E ?? "-") + (state.nil.E ? " (Nil)" : "");
+  el("wBid").textContent = "Bid: " + (state.bids.W ?? "-") + (state.nil.W ? " (Nil)" : "");
+
+  el("scoreNS").textContent = state.teamScore.NS;
+  el("scoreEW").textContent = state.teamScore.EW;
+  el("bagsNS").textContent = state.teamBags.NS;
+  el("bagsEW").textContent = state.teamBags.EW;
+
+  spadesState.textContent = state.spadesBroken ? "Spades broken" : "Spades not broken";
+
+  turnText.textContent = "Turn: " + (state.turn ? seatName(state.turn) : "-");
+  stateText.textContent = phaseLabel();
+
+  // Team bids/tricks (round)
+  const nsBid = (state.bids.N ?? 0) + (state.bids.S ?? 0);
+  const ewBid = (state.bids.E ?? 0) + (state.bids.W ?? 0);
+  const nsTr = state.tricks.N + state.tricks.S;
+  const ewTr = state.tricks.E + state.tricks.W;
+  el("teamBids").textContent = `NS: ${allBidsSet() ? nsBid : "-"} • EW: ${allBidsSet() ? ewBid : "-"}`;
+  el("teamTricks").textContent = `NS: ${nsTr} • EW: ${ewTr}`;
+
+  // Buttons
+  submitBidBtn.disabled = (state.phase !== "bidding") || (state.bids.S !== null);
+  dealBtn.disabled = !(state.phase==="idle" || state.phase==="round_end");
+}
+
+function seatName(p){
+  return {N:"NORTH", E:"EAST", S:"SOUTH", W:"WEST"}[p];
+}
+
+function phaseLabel(){
+  if(state.phase==="idle") return "Press Deal to start";
+  if(state.phase==="bidding") return "Bidding phase (submit your bid)";
+  if(state.phase==="playing") return `Playing trick ${state.trickNumber+1}/13 (Leader: ${seatName(state.leader)})`;
+  if(state.phase==="round_end") return "Round ended — press Deal for next round";
+  return state.phase;
+}
+
+function sortHand(hand){
+  // Sort by suit then rank (spades last in display? we’ll show by suit order C D H S)
+  const suitOrder = {C:0,D:1,H:2,S:3};
+  hand.sort((a,b) => suitOrder[a.s]-suitOrder[b.s] || a.r-b.r);
+}
+
+function renderHand(){
+  handEl.innerHTML = "";
+  const hand = state.hands.S;
+  sortHand(hand);
+
+  // Determine legal plays if it's your turn
+  const legal = (state.phase==="playing" && state.turn==="S") ? getLegalCards("S") : [];
+
+  for(const c of hand){
+    const wrap = document.createElement("div");
+    const isLegal = legal.some(x => cardKey(x)===cardKey(c));
+
+    const cardDiv = renderCard(c, "hcard");
+    if(state.phase==="playing" && state.turn==="S" && !isLegal) cardDiv.classList.add("illegal");
+
+    wrap.appendChild(cardDiv);
+
+    if(state.phase==="playing" && state.turn==="S" && isLegal){
+      cardDiv.addEventListener("click", () => {
+        playCard("S", c);
+      });
+    }
+    handEl.appendChild(wrap);
+  }
+}
+
+/* ============ Game Flow ============ */
+
+function resetForNewGame(){
+  state = {
+    phase: "idle",
+    hands: {N:[],E:[],S:[],W:[]},
+    bids: {N:null,E:null,S:null,W:null},
+    nil:  {N:false,E:false,S:false,W:false},
+    tricks: {N:0,E:0,S:0,W:0},
+    teamScore: {NS:0, EW:0},
+    teamBags: {NS:0, EW:0},
+    spadesBroken: false,
+    leader: "S",
+    turn: "S",
+    trick: [],
+    trickNumber: 0
+  };
+  clearTrickSlots();
+  pushLog("New game started.");
+  updateTopUI();
+  renderHand();
+}
+
+function resetForNewRound(){
+  state.hands = {N:[],E:[],S:[],W:[]};
+  state.bids  = {N:null,E:null,S:null,W:null};
+  state.nil   = {N:false,E:false,S:false,W:false};
+  state.tricks= {N:0,E:0,S:0,W:0};
+  state.spadesBroken = false;
+  state.trick = [];
+  state.trickNumber = 0;
+  clearTrickSlots();
+}
+
+function deal(){
+  resetForNewRound();
+  const deck = shuffle(makeDeck());
+
+  // Deal 13 each in order
+  let i=0;
+  for(let k=0;k<13;k++){
+    for(const p of PLAYERS){
+      state.hands[p].push(deck[i++]);
+    }
+  }
+  for(const p of PLAYERS) sortHand(state.hands[p]);
+
+  state.phase = "bidding";
+  state.turn = "S";
+  state.leader = "S";
+  clearTrickSlots();
+  pushLog("Cards dealt. Please bid.");
+  updateTopUI();
+  renderHand();
+}
+
+// Bidding heuristic for AI
+function aiBid(hand){
+  // Simple strength: count spades + high cards in any suit
+  let sp = hand.filter(c=>c.s==="S").length;
+  let high = hand.filter(c=>c.r>=12).length; // Q,K,A
+  let aces = hand.filter(c=>c.r===14).length;
+
+  // Estimate
+  let est = Math.round(sp*0.45 + high*0.35 + aces*0.25);
+
+  // Keep reasonable
+  est = Math.max(1, Math.min(6, est));
+  // Sometimes bid 0 (nil) if very weak
+  const veryWeak = sp<=1 && high<=1 && aces===0;
+  const goNil = veryWeak && Math.random()<0.35;
+  return {bid: goNil ? 0 : est, nil: goNil};
+}
+
+function allBidsSet(){
+  return PLAYERS.every(p => state.bids[p] !== null);
+}
+
+function submitYourBid(){
+  if(state.phase!=="bidding") return;
+  if(state.bids.S !== null) return;
+
+  const wantNil = !!nilCheck.checked;
+  let b = parseInt(bidSelect.value, 10);
+  if(wantNil) b = 0;
+
+  state.bids.S = b;
+  state.nil.S = wantNil;
+
+  pushLog(`You bid ${wantNil ? "NIL" : b}.`);
+
+  // AI bids
+  for(const p of ["W","N","E"]){
+    const {bid, nil} = aiBid(state.hands[p]);
+    state.bids[p] = bid;
+    state.nil[p] = nil;
+    pushLog(`${seatName(p)} bid ${nil ? "NIL" : bid}.`);
+  }
+
+  state.phase = "playing";
+  state.turn = state.leader; // leader starts first trick
+  pushLog(`Round starts. Leader is ${seatName(state.leader)}.`);
+  updateTopUI();
+  renderHand();
+
+  maybeAIMove();
+}
+
+/* ============ Legal plays ============ */
+
+function hasSuit(p, suit){
+  return state.hands[p].some(c=>c.s===suit);
+}
+
+function onlySpadesLeft(p){
+  return state.hands[p].length>0 && state.hands[p].every(c=>c.s==="S");
+}
+
+function getLeadSuit(){
+  return state.trick.length ? state.trick[0].card.s : null;
+}
+
+function getLegalCards(p){
+  const hand = state.hands[p];
+  if(state.trick.length===0){
+    // Leading
+    if(state.spadesBroken || onlySpadesLeft(p)){
+      return hand.slice();
+    }
+    // Can't lead spades if not broken (unless only spades)
+    const nonSpades = hand.filter(c=>c.s!=="S");
+    return nonSpades.length ? nonSpades : hand.slice();
+  } else {
+    const lead = getLeadSuit();
+    if(hasSuit(p, lead)){
+      return hand.filter(c=>c.s===lead);
+    }
+    // If no lead suit, can play anything (spades will break if played)
+    return hand.slice();
+  }
+}
+
+/* ============ Playing / Trick resolution ============ */
+
+function removeCardFromHand(p, card){
+  const key = cardKey(card);
+  const idx = state.hands[p].findIndex(c=>cardKey(c)===key);
+  if(idx>=0) state.hands[p].splice(idx,1);
+}
+
+function playCard(p, card){
+  if(state.phase!=="playing") return;
+  if(state.turn!==p) return;
+
+  const legal = getLegalCards(p).some(c=>cardKey(c)===cardKey(card));
+  if(!legal){
+    pushLog("Illegal move: follow suit or spades not broken for lead.");
+    return;
+  }
+
+  // Break spades if a spade is played when not broken and it's not a lead restriction scenario
+  if(card.s==="S" && !state.spadesBroken){
+    // If trick already started OR player had no choice but spades? still breaks once spade played in play.
+    state.spadesBroken = true;
+  }
+
+  removeCardFromHand(p, card);
+  state.trick.push({p, card});
+  slots[p].innerHTML = "";
+  slots[p].appendChild(renderCard(card));
+
+  pushLog(`${seatName(p)} played ${cardToText(card)}.`);
+
+  // Next turn or resolve trick
+  if(state.trick.length < 4){
+    state.turn = nextPlayer(p);
+    updateTopUI();
+    renderHand();
+    maybeAIMove();
+  } else {
+    // Resolve
+    const winner = trickWinner(state.trick);
+    state.tricks[winner] += 1;
+    state.leader = winner;
+    state.turn = winner;
+
+    pushLog(`Trick ${state.trickNumber+1} won by ${seatName(winner)}.`);
+    state.trickNumber += 1;
+
+    // Clear after short delay
+    setTimeout(() => {
+      state.trick = [];
+      clearTrickSlots();
+      updateTopUI();
+      renderHand();
+
+      if(state.trickNumber >= 13){
+        endRound();
+      } else {
+        maybeAIMove();
+      }
+    }, 650);
+  }
+
+  updateTopUI();
+  renderHand();
+}
+
+function nextPlayer(p){
+  const idx = PLAYERS.indexOf(p);
+  return PLAYERS[(idx+1)%4];
+}
+
+function trickWinner(trick){
+  const leadSuit = trick[0].card.s;
+
+  // Determine best card by spades trump, else lead suit
+  let best = trick[0];
+  for(const t of trick.slice(1)){
+    const a = best.card;
+    const b = t.card;
+
+    const aTrump = (a.s==="S");
+    const bTrump = (b.s==="S");
+
+    if(!aTrump && bTrump){
+      best = t; continue;
+    }
+    if(aTrump && !bTrump){
+      continue;
+    }
+    // both trump or both non-trump:
+    if(!aTrump && !bTrump){
+      // must follow lead suit to compete
+      const aLead = (a.s===leadSuit);
+      const bLead = (b.s===leadSuit);
+      if(!aLead && bLead){ best = t; continue; }
+      if(aLead && !bLead){ continue; }
+      if(aLead && bLead && b.r > a.r){ best = t; continue; }
+    } else {
+      // both spades
+      if(b.r > a.r){ best = t; continue; }
+    }
+  }
+  return best.p;
+}
+
+/* ============ AI ============ */
+
+function aiChooseCard(p){
+  const legal = getLegalCards(p);
+  const leadSuit = getLeadSuit();
+
+  // Simple strategy:
+  // - If leading: play lowest non-spade (unless spades broken), else lowest spade.
+  // - If following suit: play lowest card that can win; if cannot win, dump lowest.
+  // - If void: if can trump, use lowest spade to win (sometimes), else dump lowest card.
+
+  function lowest(cards){
+    return cards.slice().sort((a,b)=>a.r-b.r)[0];
+  }
+  function highest(cards){
+    return cards.slice().sort((a,b)=>b.r-a.r)[0];
+  }
+  function canWinWith(card){
+    const tempTrick = state.trick.concat([{p, card}]);
+    // Not complete trick, but compare against current best among played
+    const currentBest = trickWinner(state.trick);
+    const bestCard = state.trick.find(x=>x.p===currentBest).card;
+    // compare this card vs bestCard under trick rules:
+    const lead = leadSuit ?? card.s;
+    const b = bestCard;
+    const a = card;
+
+    const aTrump = a.s==="S";
+    const bTrump = b.s==="S";
+    if(!bTrump && aTrump) return true;
+    if(bTrump && !aTrump) return false;
+
+    if(!aTrump && !bTrump){
+      if(a.s!==lead) return false;
+      if(b.s!==lead) return true;
+      return a.r > b.r;
+    }
+    // both spades
+    return a.r > b.r;
+  }
+
+  if(state.trick.length===0){
+    // lead
+    const nonSpades = legal.filter(c=>c.s!=="S");
+    if(nonSpades.length) return lowest(nonSpades);
+    return lowest(legal);
+  }
+
+  // if has lead suit
+  if(leadSuit && legal.every(c=>c.s===leadSuit)){
+    const winning = legal.filter(canWinWith);
+    if(winning.length){
+      // try smallest winning card
+      return winning.sort((a,b)=>a.r-b.r)[0];
+    }
+    // cannot win: dump lowest
+    return lowest(legal);
+  }
+
+  // void in suit: decide whether to trump
+  const spades = legal.filter(c=>c.s==="S");
+  if(spades.length){
+    // 65% chance to trump, else dump lowest non-spade
+    if(Math.random() < 0.65) return lowest(spades);
+  }
+  // dump lowest
+  return lowest(legal);
+}
+
+function maybeAIMove(){
+  if(state.phase!=="playing") return;
+  if(state.turn==="S") return;
+
+  // play AI with small delay for feel
+  setTimeout(() => {
+    if(state.phase!=="playing") return;
+    if(state.turn==="S") return;
+    const p = state.turn;
+    const card = aiChooseCard(p);
+    playCard(p, card);
+  }, 420);
+}
+
+/* ============ Scoring ============ */
+
+function endRound(){
+  // Calculate team totals for this round
+  const nsBid = state.bids.N + state.bids.S;
+  const ewBid = state.bids.E + state.bids.W;
+
+  const nsTr  = state.tricks.N + state.tricks.S;
+  const ewTr  = state.tricks.E + state.tricks.W;
+
+  // Nil scoring per player
+  function nilScore(p){
+    if(!state.nil[p]) return 0;
+    return (state.tricks[p]===0) ? 100 : -100;
+  }
+
+  const nsNil = nilScore("N") + nilScore("S");
+  const ewNil = nilScore("E") + nilScore("W");
+
+  // Team bid score
+  function teamScore(teamBid, teamTr, teamKey){
+    let score = 0;
+    let bagsAdd = 0;
+
+    if(teamTr >= teamBid){
+      score += teamBid * 10;
+      bagsAdd = teamTr - teamBid;
+      score += bagsAdd; // 1 point per bag
+    } else {
+      score -= teamBid * 10;
+    }
+
+    // Apply bags
+    state.teamBags[teamKey] += bagsAdd;
+    if(state.teamBags[teamKey] >= 10){
+      // bag penalty: -100 and subtract 10 bags
+      score -= 100;
+      state.teamBags[teamKey] -= 10;
+      pushLog(`${teamKey} got 10 bags → -100 penalty.`);
+    }
+
+    return score;
+  }
+
+  const nsBase = teamScore(nsBid, nsTr, "NS");
+  const ewBase = teamScore(ewBid, ewTr, "EW");
+
+  state.teamScore.NS += nsBase + nsNil;
+  state.teamScore.EW += ewBase + ewNil;
+
+  pushLog(`Round over. NS tricks ${nsTr}/${nsBid}, EW tricks ${ewTr}/${ewBid}.`);
+  if(nsNil) pushLog(`NS Nil points: ${nsNil > 0 ? "+" : ""}${nsNil}.`);
+  if(ewNil) pushLog(`EW Nil points: ${ewNil > 0 ? "+" : ""}${ewNil}.`);
+  pushLog(`NS round points: ${(nsBase+nsNil) >= 0 ? "+" : ""}${nsBase+nsNil} • EW round points: ${(ewBase+ewNil) >= 0 ? "+" : ""}${ewBase+ewNil}`);
+
+  state.phase = "round_end";
+  updateTopUI();
+  renderHand();
+}
+
+/* ============ Auto-play ============ */
+
+async function autoPlayRound(){
+  if(state.phase==="idle" || state.phase==="round_end"){
+    deal();
+  }
+  if(state.phase==="bidding"){
+    // Auto-bid for you too (simple)
+    const {bid, nil} = aiBid(state.hands.S);
+    bidSelect.value = String(bid);
+    nilCheck.checked = nil;
+    submitYourBid();
+  }
+  // play until round end
+  const loop = () => new Promise(resolve => {
+    const t = setInterval(() => {
+      if(state.phase==="round_end"){ clearInterval(t); resolve(); }
+      else if(state.phase==="playing" && state.turn==="S"){
+        // you (auto): choose AI-like card
+        const c = aiChooseCard("S");
+        playCard("S", c);
+      }
+    }, 120);
+  });
+  await loop();
+}
+
+/* ============ Events ============ */
+
+submitBidBtn.addEventListener("click", submitYourBid);
+
+dealBtn.addEventListener("click", () => {
+  if(state.phase==="idle" || state.phase==="round_end") deal();
+});
+
+newBtn.addEventListener("click", () => {
+  resetForNewGame();
+});
+
+autoPlayBtn.addEventListener("click", () => {
+  autoPlayRound();
+});
+
+// First load
+resetForNewGame();
+updateTopUI();
+renderHand();
+
+pushLog("Tip: Click Deal → Submit your bid → Click a card when it’s your turn.");
+</script>
+</body>
+</html>
