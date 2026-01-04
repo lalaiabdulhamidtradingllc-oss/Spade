@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+/* ================= BASE STYLE ================= */
+body{
+  font-family:Arial;
+  background:#f4f6f9;
+  margin:0;
+}
+
+.container{
+  max-width:600px;
+  margin:auto;
+  padding:15px;
+}
+
+h2{
+  margin-top:0;
+}
+
+input,select,button{
+  width:100%;
+  padding:14px;
+  margin-top:10px;
+  font-size:16px;
+  box-sizing:border-box;
+}
+
+button{
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+/* Buttons */
+.primary{background:#2563eb;color:#fff}
+.success{background:#16a34a;color:#fff}
+.warn{background:#f59e0b;color:#fff}
+.danger{background:#dc2626;color:#fff}
+
+.locked{background:#e5e7eb}
+
+/* Transaction Buttons */
+.txn-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:5px;
+}
+
+.btn-txn{
+  padding:12px 5px !important;
+  font-weight:bold;
+  font-size:14px;
+  opacity:0.7;
+}
+
+.sales{background:#16a34a;color:white}
+.purchase{background:#2563eb;color:white}
+.cust-pay{background:#f59e0b;color:white}
+.supp-pay{background:#dc2626;color:white}
+.expense{background:#0ea5e9;color:white}
+.adjust{background:#4b5563;color:white}
+
+.btn-txn.active{
+  opacity:1;
+  border:2px solid #000;
+}
+
+/* Info box */
+.info{
+  background:#0ea5e9;
+  color:#fff;
+  padding:18px;
+  margin-top:15px;
+  border-radius:10px;
+  font-size:20px;
+}
+
+.info b{
+  font-size:22px;
+}
+
+.error{
+  background:#fee2e2;
+  color:#991b1b;
+  padding:10px;
+  margin-top:10px;
+  border-radius:6px;
+}
+
+/* Profit */
+.profit-box{
+  margin-top:15px;
+  padding:12px;
+  background:#fff;
+  border-left:6px solid #0ea5e9;
+}
+
+.profit-positive{color:#16a34a;font-weight:bold;font-size:18px}
+.profit-negative{color:#dc2626;font-weight:bold;font-size:18px}
+
+/* ================= MOBILE STYLE ================= */
+@media (max-width:480px){
+
+  h2{
+    font-size:18px;
+    text-align:center;
+  }
+
+  .container{
+    padding:10px;
+  }
+
+  input,select,button{
+    font-size:15px;
+    padding:12px;
+  }
+
+  .txn-grid{
+    gap:6px;
+  }
+
+  .btn-txn{
+    font-size:13px;
+    padding:10px 4px !important;
+  }
+
+  .info{
+    font-size:16px;
+    padding:14px;
+  }
+
+  .info b{
+    font-size:18px;
+  }
+
+  table{
+    font-size:13px;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h2>Lalai Abdulhamid Trading LLC.</h2>
+
+<div id="msg"></div>
+
+<label><b>Transaction Type</b></label>
+<div class="txn-grid">
+  <button class="btn-txn sales">SALES</button>
+  <button class="btn-txn purchase">PURCHASE</button>
+  <button class="btn-txn cust-pay">RECEIVED +</button>
+  <button class="btn-txn supp-pay">PAYMENT -</button>
+  <button class="btn-txn expense">EXPENSE</button>
+  <button class="btn-txn adjust">ADJUST</button>
+</div>
+
+<input type="date">
+<input placeholder="Serial Number">
+
+<select>
+  <option>Select Supplier</option>
+</select>
+
+<select>
+  <option>Select Customer</option>
+</select>
+
+<select>
+  <option>USDT</option>
+  <option>SKYE</option>
+  <option>6M RMB</option>
+  <option>ALIPAY</option>
+  <option>CASH</option>
+</select>
+
+<input type="number" placeholder="Amount">
+<input type="number" placeholder="Supplier Rate">
+<input type="number" placeholder="Customer Rate">
+
+<div class="profit-box">
+  <div class="profit-positive">Profit: 0.00</div>
+</div>
+
+<button class="primary">Submit</button>
+<button class="success">Search</button>
+<button class="warn">Edit</button>
+<button class="danger">Delete</button>
+<button>Reset</button>
+
+<button class="info">Supplier Statement</button>
+<button class="info">Customer Statement</button>
+
+</div>
+</body>
+</html>
