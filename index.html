@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Anti-Hiding Spades</title>
+    <style>
+        :root {
+            --bg-color: #2e7d32;
+            --card-w: 60px;
+            --card-h: 84px;
+            --text-color: #fff;
+            --accent: #ffc107;
+            --chat-bg: rgba(0,0,0,0.6);
+        }
+
+        * { box-sizing: border-box; touch-action: manipulation; }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-color); overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+
+        /* --- TABS --- */
+        .tabs { display: flex; background: rgba(0,0,0,0.3); height: 50px; flex-shrink: 0; }
+        .tab { flex: 1; display: flex; justify-content: center; align-items: center; cursor: pointer; border-bottom: 3px solid transparent; font-weight: bold; }
+        .tab.active { border-bottom-color: var(--accent); color: var(--accent); }
+        .tab-content { flex: 1; display: none; overflow-y: auto; padding: 10px; position: relative; }
+        .tab-content.active { display: flex; flex-direction: column; }
+
+        /* --- PLAY AREA --- */
+        #game-view { justify-content: space-between; padding: 0; }
+        
+        .top-info { display: flex; justify-content: space-between; padding: 5px 10px; background: rgba(0,0,0,0.2); font-size: 0.9rem; }
+        .score-box { font-weight: bold; }
+        .highlight { color: var(--accent); }
+
+        /* Opponents */
+        .opponents-row { display: flex; justify-content: space-between; padding: 10px; align-items: flex-start; height: 100px; }
+        .player-area { display: flex; flex-direction: column; align-items: center; width: 80px; position: relative; }
+        .player-avatar { width: 40px; height: 40px; background: #555; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; border: 2px solid #fff; margin-bottom: 5px; }
+        .player-avatar.active-turn { border-color: var(--accent); box-shadow: 0 0 10px var(--accent); background: #444; }
+        .player-info { font-size: 0.75rem; text-align: center; text-shadow: 1px 1px 2px black; }
+        .bubble { position: absolute; top: 45px; background: white; color: black; padding: 5px; border-radius: 5px; font-size: 0.7rem; width: 120px; z-index: 100; pointer-events: none; opacity: 0; transition: opacity 0.3s; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .bubble.show { opacity: 1; }
+
+        /* Table (Trick) */
+        .table-area { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
+        .played-card { position: absolute; width: var(--card-w); height: var(--card-h); background: white; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 1.5rem; transition: all 0.3s ease; }
+        .played-card[data-suit="♥"], .played-card[data-suit="♦"] { color: #d32f2f; }
+        .played-card[data-suit="♠"], .played-card[data-suit="♣"] { color: #000; }
+        /* Positioning played cards based on seat */
+        .pc-top { transform: translateY(-40px); }
+        .pc-left { transform: translateX(-50px) translateY(-10px); }
+        .pc-right { transform: translateX(50px) translateY(-10px); }
+        .pc-bottom { transform: translateY(40px); }
+
+        /* Human Hand */
+        .my-hand-area { height: 160px; position: relative; width: 100%; overflow: hidden; display: flex; justify-content: center; background: linear-gradient(to top, rgba(0,0,0,0.5), transparent); }
+        .card { 
+            width: var(--card-w); height: var(--card-h); 
+            background: white; border-radius: 6px; 
+            position: absolute; bottom: 10px; 
+            box-shadow: -2px 0 5px rgba(0,0,0,0.3); 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            font-size: 1.5rem; font-weight: bold;
+            transition: transform 0.2s; cursor: pointer; border: 1px solid #ccc;
+        }
+        .card[data-suit="♥"], .card[data-suit="♦"] { color: #d32f2f; }
+        .card[data-suit="♠"], .card[data-suit="♣"] { color: #000; }
+        .card.selected { transform: translateY(-20px); border-color: var(--accent); box-shadow: 0 0 10px var(--accent); }
+        .card.disabled { filter: brightness(0.6); pointer-events: none; }
+
+        /* Controls / Bidding */
+        .overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; text-align: center; padding: 20px; }
+        .overlay.hidden { display: none; }
+        .btn { background: var(--accent); color: #000; border: none; padding: 12px 24px; font-size: 1rem; font-weight: bold; border-radius: 5px; margin: 5px; cursor: pointer; }
+        .btn:disabled { opacity: 0.5; }
+        .bid-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 20px; }
+        .bid-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #fff; background: transparent; color: white; font-weight: bold; font-size: 1.1rem; }
+        .bid-btn:active, .bid-btn.selected { background: var(--accent); color: black; border-color: var(--accent); }
+
+        /* Chat Log */
+        .chat-panel { 
+            position: absolute; top: 110px; left: 10px; right: 10px; height: 100px; 
+            pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; 
+            overflow: hidden; 
+        }
+        .chat-line { font-size: 0.8rem; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; margin-top: 2px; align-self: flex-start; text-shadow: 1px 1px 1px #000; animation: fadein 0.3s; }
+        @keyframes fadein { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+        /* Rules Text */
+        .rules-text { font-size: 0.9rem; line-height: 1.5; color: #eee; }
+        h3 { border-bottom: 1px solid #777; padding-bottom: 5px; color: var(--accent); }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 5px; }
+
+        /* Scoreboard */
+        .score-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .score-table th, .score-table td { border: 1px solid #555; padding: 8px; text-align: center; }
+        .score-table th { background: rgba(0,0,0,0.5); color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('play')">Play</div>
+    <div class="tab" onclick="switchTab('score')">Score</div>
+    <div class="tab" onclick="switchTab('rules')">Rules</div>
+</div>
+
+<div id="game-view" class="tab-content active">
+    
+    <div class="top-info">
+        <span>Target: 7 Pts</span>
+        <span id="round-indicator">Round 1</span>
+        <span id="baseline-display" class="highlight">Bid: --</span>
+    </div>
+
+    <div class="opponents-row">
+        <div class="player-area">
+            <div id="avatar-1" class="player-avatar">B</div>
+            <div class="player-info">
+                Opponent<br>
+                <span id="bid-1"></span> | <span id="tricks-1">Tricks: 0</span>
+            </div>
+            <div id="bubble-1" class="bubble"></div>
+        </div>
+        <div class="player-area">
+            <div id="avatar-2" class="player-avatar">C</div>
+            <div class="player-info">
+                Partner<br>
+                <span id="bid-2"></span> | <span id="tricks-2">Tricks: 0</span>
+            </div>
+            <div id="bubble-2" class="bubble"></div>
+        </div>
+        <div class="player-area">
+            <div id="avatar-3" class="player-avatar">D</div>
+            <div class="player-info">
+                Opponent<br>
+                <span id="bid-3"></span> | <span id="tricks-3">Tricks: 0</span>
+            </div>
+            <div id="bubble-3" class="bubble"></div>
+        </div>
+    </div>
+
+    <div id="chat-box" class="chat-panel"></div>
+
+    <div class="table-area" id="table-area">
+        </div>
+
+    <div class="my-hand-area" id="my-hand-container">
+        </div>
+    
+    <div style="text-align: center; padding: 5px; background: rgba(0,0,0,0.3);">
+        <span id="status-msg">Waiting for deal...</span>
+        <br>
+        <span class="highlight" id="my-stats">Bid: - | Tricks: 0</span>
+    </div>
+</div>
+
+<div id="score-view" class="tab-content">
+    <h3>Scoreboard</h3>
+    <table class="score-table">
+        <thead>
+            <tr>
+                <th>Round</th>
+                <th>Us (A+C)</th>
+                <th>Them (B+D)</th>
+            </tr>
+        </thead>
+        <tbody id="score-body"></tbody>
+        <tfoot>
+            <tr>
+                <th>Total</th>
+                <th id="total-us">0</th>
+                <th id="total-them">0</th>
+            </tr>
+        </tfoot>
+    </table>
+    <div style="margin-top:20px; text-align:center;">
+        <button class="btn" onclick="switchTab('play')">Back to Game</button>
+    </div>
+</div>
+
+<div id="rules-view" class="tab-content">
+    <div class="rules-text">
+        <h3>Local Rules</h3>
+        <ul>
+            <li><strong>Win Condition:</strong> First team to 7 points.</li>
+            <li><strong>Scoring:</strong> Points are ONLY awarded for <em>extra</em> tricks above the team baseline.
+                <br><em>Example:</em> Baseline is 6. If you take 6, 0 pts. If you take 8, +2 pts. If you take 4, 0 pts (no penalty).</li>
+            <li><strong>Relaxed Spades:</strong> Spades can be led at any time.</li>
+            <li><strong>No Nil/Blind:</strong> Bids of 0 are treated as normal bids (no bonus).</li>
+        </ul>
+        <h3>Anti-Hiding Declaration</h3>
+        <ul>
+            <li>After bidding, Opponents (AI) analyze if you are "hiding" (bidding low to farm points).</li>
+            <li>If they suspect you, they will <strong>Declare</strong> a higher baseline for your team.</li>
+            <li>You must score above this declared baseline to get points.</li>
+            <li>"Give me your cards. We declare you will make Y."</li>
+        </ul>
+    </div>
+</div>
+
+<div id="bidding-overlay" class="overlay hidden">
+    <h2>Place Your Bid</h2>
+    <p>Estimate your tricks.</p>
+    <div class="bid-grid" id="bid-buttons"></div>
+</div>
+
+<div id="game-over-overlay" class="overlay hidden">
+    <h2 id="winner-text">Game Over</h2>
+    <p id="final-score-text"></p>
+    <button class="btn" onclick="restartGame()">Play Again</button>
+</div>
+
+<script>
+/**
+ * GAME CONSTANTS & STATE
+ */
+const SUITS = ['♠', '♥', '♣', '♦']; // Spades, Hearts, Clubs, Diamonds
+const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const VALUES = { '2':2, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9, '10':10, 'J':11, 'Q':12, 'K':13, 'A':14 };
+
+let state = {
+    phase: 'setup', // setup, bidding, declaring, playing, scoring, gameover
+    round: 1,
+    deck: [],
+    players: [], // 0: Human(A), 1: AI(B), 2: AI(C-Partner), 3: AI(D)
+    dealer: 0,
+    turn: 0, // 0-3
+    handTricks: [0,0,0,0],
+    bids: [-1,-1,-1,-1],
+    teamBaseline: 0, // A+C bid
+    declaredBaseline: 0, // The override value
+    isDeclared: false,
+    trickCards: [], // {playerId, card}
+    leadSuit: null,
+    scores: { us: 0, them: 0 },
+    history: [] // { round, usBid, usTricks, themBid, themTricks }
+};
+
+// --- INIT ---
+function init() {
+    createBidButtons();
+    restartGame();
+}
+
+function restartGame() {
+    state.scores = { us: 0, them: 0 };
+    state.round = 1;
+    state.history = [];
+    state.dealer = Math.floor(Math.random() * 4);
+    updateScoreboard();
+    document.getElementById('game-over-overlay').classList.add('hidden');
+    startRound();
+}
+
+function startRound() {
+    state.phase = 'setup';
+    state.deck = createDeck();
+    state.players = [[], [], [], []];
+    state.bids = [-1, -1, -1, -1];
+    state.handTricks = [0, 0, 0, 0];
+    state.trickCards = [];
+    state.leadSuit = null;
+    state.isDeclared = false;
+    state.dealer = (state.dealer + 1) % 4;
+    state.turn = (state.dealer + 1) % 4; // Left of dealer leads
+    
+    // UI Reset
+    document.getElementById('table-area').innerHTML = '';
+    document.getElementById('chat-box').innerHTML = '';
+    document.getElementById('round-indicator').innerText = 'Round ' + state.round;
+    document.getElementById('baseline-display').innerText = 'Bidding...';
+    [1,2,3].forEach(id => {
+        document.getElementById(`bid-${id}`).innerText = '';
+        document.getElementById(`tricks-${id}`).innerText = 'Tricks: 0';
+        document.getElementById(`bubble-${id}`).classList.remove('show');
+    });
+    document.getElementById('my-stats').innerText = 'Bid: - | Tricks: 0';
+    updateAvatarActive();
+
+    deal();
+    renderHand();
+    
+    // Start Bidding Phase
+    state.phase = 'bidding';
+    
+    // If human is not first to bid, simulate others first? 
+    // Simplified: Human always bids first for UI flow, then AIs bid.
+    document.getElementById('bidding-overlay').classList.remove('hidden');
+}
+
+/**
+ * DECK & LOGIC
+ */
+function createDeck() {
+    let d = [];
+    for(let s of SUITS) {
+        for(let r of RANKS) {
+            d.push({ suit: s, rank: r, value: VALUES[r], id: r+s });
+        }
+    }
+    // Shuffle
+    for(let i = d.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [d[i], d[j]] = [d[j], d[i]];
+    }
+    return d;
+}
+
+function deal() {
+    for(let i=0; i<52; i++) {
+        state.players[i%4].push(state.deck[i]);
+    }
+    // Sort hands
+    state.players.forEach(hand => {
+        hand.sort((a,b) => {
+            if(a.suit === b.suit) return b.value - a.value; // High to low
+            // Order: S, H, C, D
+            const order = {'♠':0, '♥':1, '♣':2, '♦':3};
+            return order[a.suit] - order[b.suit];
+        });
+    });
+}
+
+/**
+ * BIDDING LOGIC
+ */
+function createBidButtons() {
+    const grid = document.getElementById('bid-buttons');
+    grid.innerHTML = '';
+    for(let i=0; i<=13; i++) {
+        const b = document.createElement('button');
+        b.className = 'bid-btn';
+        b.innerText = i;
+        b.onclick = () => humanBid(i);
+        grid.appendChild(b);
+    }
+}
+
+function humanBid(val) {
+    state.bids[0] = val;
+    document.getElementById('bidding-overlay').classList.add('hidden');
+    addChat('You', `I bid ${val}.`);
+    runAIBidding();
+}
+
+function runAIBidding() {
+    // 1. Opponent B bids
+    state.bids[1] = calculateAIBid(state.players[1]);
+    updatePlayerInfo(1);
+
+    // 2. Partner C bids
+    state.bids[2] = calculateAIBid(state.players[2], state.bids[0]); // Knows human bid
+    updatePlayerInfo(2);
+    // Partner speaks
+    chat(2, `I'm good for ${state.bids[2]}.`);
+
+    // 3. Opponent D bids
+    state.bids[3] = calculateAIBid(state.players[3]);
+    updatePlayerInfo(3);
+
+    // Calc Baselines
+    state.teamBaseline = state.bids[0] + state.bids[2];
+    const oppBaseline = state.bids[1] + state.bids[3];
+
+    document.getElementById('my-stats').innerText = `Bid: ${state.bids[0]} | Tricks: 0`;
+
+    // 4. Opponent "Declare" Logic (The Anti-Hiding Rule)
+    setTimeout(() => {
+        checkDeclare();
+    }, 1000);
+}
+
+function calculateAIBid(hand, partnerBid = null) {
+    // Heuristic
+    let score = 0;
+    let spades = hand.filter(c => c.suit === '♠');
+    
+    // Spades
+    spades.forEach(c => {
+        if(c.value >= 12) score += 1.0; // A, K, Q
+        else if(c.value >= 10) score += 0.6; // J, 10
+        else score += 0.3; // Low spades
+    });
+
+    // Other Suits
+    ['♥', '♣', '♦'].forEach(s => {
+        let suitCards = hand.filter(c => c.suit === s);
+        let len = suitCards.length;
+        if(len === 0) score += 0.8; // Void
+        if(len === 1) score += 0.5; // Singleton
+        suitCards.forEach(c => {
+            if(c.value === 14) score += 0.9; // Ace
+            if(c.value === 13 && len >= 2) score += 0.5; // King with protection
+            if(c.value === 12 && len >= 3) score += 0.3; // Queen with protection
+        });
+    });
+
+    let bid = Math.round(score);
+    // Adjustment based on partner (Player C logic)
+    if(partnerBid !== null) {
+        if(partnerBid >= 5) bid = Math.max(0, bid - 1); // Conservative
+        if(partnerBid <= 2 && score > 3) bid += 1; // Pick up slack
+    }
+    
+    return Math.max(0, Math.min(13, bid));
+}
+
+function checkDeclare() {
+    // Detect hiding
+    // Suspicion Model
+    let suspicion = 0;
+    
+    // 1. Current Bid Analysis
+    if(state.teamBaseline <= 4) suspicion += 0.4;
+    
+    // 2. History Analysis (Sandbagging ratio)
+    let totalExtras = 0;
+    let hands = 0;
+    state.history.forEach(h => {
+        let extra = Math.max(0, h.usTricks - h.usBid);
+        totalExtras += extra;
+        hands++;
+    });
+    
+    if(hands > 0) {
+        let avgExtra = totalExtras / hands;
+        if(avgExtra > 1.2) suspicion += 0.4;
+        if(avgExtra > 2.0) suspicion += 0.6;
+    }
+
+    // Decision
+    if(suspicion >= 0.65) {
+        // DECLARE!
+        state.isDeclared = true;
+        let bump = (suspicion >= 0.85) ? 2 : 1;
+        state.declaredBaseline = Math.min(13, state.teamBaseline + bump);
+        
+        // Who speaks? Opponent D usually
+        chat(3, `Give me your cards! We declare you make ${state.declaredBaseline}.`);
+        document.getElementById('baseline-display').innerText = `Team Bid: ${state.teamBaseline} | DECLARED: ${state.declaredBaseline}`;
+        document.getElementById('baseline-display').style.color = 'red';
+    } else {
+        // Accept
+        chat(1, "We accept your bid.");
+        state.declaredBaseline = state.teamBaseline;
+        document.getElementById('baseline-display').innerText = `Team Bid: ${state.teamBaseline}`;
+        document.getElementById('baseline-display').style.color = '#ffc107';
+    }
+
+    // Start Play
+    setTimeout(() => {
+        state.phase = 'playing';
+        startTurn();
+    }, 1500);
+}
+
+
+/**
+ * PLAY LOGIC
+ */
+function startTurn() {
+    updateAvatarActive();
+    if(state.turn === 0) {
+        // Human Turn
+        document.getElementById('status-msg').innerText = "Your Turn";
+        renderHand(); // update legal moves
+    } else {
+        document.getElementById('status-msg').innerText = `Player ${['A','B','C','D'][state.turn]}'s Turn`;
+        setTimeout(aiPlayCard, 800 + Math.random()*500);
+    }
+}
+
+function aiPlayCard() {
+    const player = state.turn;
+    const hand = state.players[player];
+    const legalMoves = getLegalMoves(hand);
+    
+    // AI Logic
+    // 1. Identify winning card currently
+    let currentWinnerIdx = -1;
+    let bestCard = null;
+    
+    if (state.trickCards.length > 0) {
+        let bestVal = -1;
+        let lead = state.leadSuit;
+        state.trickCards.forEach((play, idx) => {
+            let val = play.card.value;
+            if(play.card.suit === '♠' && lead !== '♠') val += 100; // Trump
+            else if(play.card.suit !== lead && play.card.suit !== '♠') val = -1; // Off suit non-trump
+            
+            if(val > bestVal) {
+                bestVal = val;
+                currentWinnerIdx = idx;
+            }
+        });
+        // Map trick index back to player ID?
+        // trickCards stores {id: playerId, card: ...}
+        // Actually, let's just see if Partner is winning
+    }
+
+    let partnerId = (player + 2) % 4;
+    let partnerWinning = false;
+    
+    if(state.trickCards.length > 0) {
+        // Evaluate current winner logic properly
+        let highest = null;
+        state.trickCards.forEach(tc => {
+            if(!highest) { highest = tc; return; }
+            if(compareCards(tc.card, highest.card, state.leadSuit) > 0) highest = tc;
+        });
+        if(highest.id === partnerId) partnerWinning = true;
+    }
+
+    let cardToPlay = null;
+
+    if(state.leadSuit === null) {
+        // Leading
+        // Play Ace if have it, else low
+        // If late game (cards < 4), try to win everything
+        if(hand.length < 5) {
+             // Try to win: High spade or High card
+             legalMoves.sort((a,b) => b.value - a.value); // Desc
+             cardToPlay = legalMoves[0];
+        } else {
+            // Play low to save power, unless have Ace/King of non-spade
+            let highNonSpade = legalMoves.find(c => c.value >= 13 && c.suit !== '♠');
+            if(highNonSpade) cardToPlay = highNonSpade;
+            else {
+                // Lead low
+                legalMoves.sort((a,b) => a.value - b.value);
+                cardToPlay = legalMoves[0];
+            }
+        }
+    } else {
+        // Following
+        if (partnerWinning) {
+            // Slough lowest legal
+            legalMoves.sort((a,b) => a.value - b.value);
+            cardToPlay = legalMoves[0];
+        } else {
+            // Try to win
+            // Get winning card value
+            let winningCard = null;
+             state.trickCards.forEach(tc => {
+                if(!winningCard || compareCards(tc.card, winningCard, state.leadSuit) > 0) winningCard = tc.card;
+            });
+
+            // Find smallest card that beats winningCard
+            let winners = legalMoves.filter(c => compareCards(c, winningCard, state.leadSuit) > 0);
+            if(winners.length > 0) {
+                winners.sort((a,b) => a.value - b.value); // Smallest winner
+                cardToPlay = winners[0];
+            } else {
+                // Can't win, play lowest
+                legalMoves.sort((a,b) => a.value - b.value);
+                cardToPlay = legalMoves[0];
+            }
+        }
+    }
+
+    playCardAction(cardToPlay);
+}
+
+function getLegalMoves(hand) {
+    if(state.leadSuit === null) return hand; // Relaxed spades rule
+    let follows = hand.filter(c => c.suit === state.leadSuit);
+    if(follows.length > 0) return follows;
+    return hand; // Can play anything (spades or off)
+}
+
+function playCardAction(card) {
+    // Remove from hand
+    let pIdx = state.turn;
+    let h = state.players[pIdx];
+    let idx = h.findIndex(c => c.id === card.id);
+    h.splice(idx, 1);
+
+    // Add to table
+    state.trickCards.push({ id: pIdx, card: card });
+    
+    // Set lead suit
+    if(state.leadSuit === null) state.leadSuit = card.suit;
+
+    // UI
+    renderTable();
+    if(pIdx === 0) renderHand(); // Update human hand
+
+    // Next turn or evaluate trick
+    if(state.trickCards.length === 4) {
+        setTimeout(evaluateTrick, 1000);
+    } else {
+        state.turn = (state.turn + 1) % 4;
+        startTurn();
+    }
+}
+
+function evaluateTrick() {
+    let winnerId = -1;
+    let winningCard = null;
+
+    state.trickCards.forEach(tc => {
+        if(!winningCard) {
+            winningCard = tc.card;
+            winnerId = tc.id;
+        } else {
+            if(compareCards(tc.card, winningCard, state.leadSuit) > 0) {
+                winningCard = tc.card;
+                winnerId = tc.id;
+            }
+        }
+    });
+
+    state.handTricks[winnerId]++;
+    
+    // Update UI
+    [1,2,3].forEach(id => {
+        document.getElementById(`tricks-${id}`).innerText = `Tricks: ${state.handTricks[id]}`;
+    });
+    document.getElementById('my-stats').innerText = `Bid: ${state.bids[0]} | Tricks: ${state.handTricks[0]}`;
+
+    // Clear table
+    state.trickCards = [];
+    state.leadSuit = null;
+    state.turn = winnerId; // Winner leads
+
+    // Check End of Round
+    if(state.players[0].length === 0) {
+        setTimeout(scoreRound, 500);
+    } else {
+        renderTable();
+        startTurn();
+    }
+}
+
+function compareCards(c1, c2, lead) {
+    // Returns >0 if c1 beats c2, <0 if c2 beats c1
+    if(c1.suit === c2.suit) return c1.value - c2.value;
+    if(c1.suit === '♠') return 1; // c1 is trump, c2 is not (implied by first check)
+    if(c2.suit === '♠') return -1;
+    if(c1.suit === lead) return 1; // c1 follows suit, c2 doesn't
+    if(c2.suit === lead) return -1;
+    return c1.value - c2.value; // Both junk, technically order doesn't matter much but higher value "better"
+}
+
+function scoreRound() {
+    state.phase = 'scoring';
+    
+    // US (A+C)
+    let usTricks = state.handTricks[0] + state.handTricks[2];
+    let usBase = state.declaredBaseline; // Uses declaration
+    let usPoints = 0;
+    if(usTricks > usBase) usPoints = usTricks - usBase;
+    state.scores.us += usPoints;
+
+    // THEM (B+D)
+    let themTricks = state.handTricks[1] + state.handTricks[3];
+    let themBase = state.bids[1] + state.bids[3]; // Standard bids
+    let themPoints = 0;
+    if(themTricks > themBase) themPoints = themTricks - themBase;
+    state.scores.them += themPoints;
+
+    // History
+    state.history.push({
+        round: state.round,
+        usBid: state.bids[0] + state.bids[2], // Actual bid, not declared
+        usTricks: usTricks,
+        themBid: themBase,
+        themTricks: themTricks
+    });
+
+    updateScoreboard();
+
+    // Check Win
+    if(state.scores.us >= 7 || state.scores.them >= 7) {
+        let txt = "";
+        if(state.scores.us >= 7 && state.scores.us > state.scores.them) txt = "You Win!";
+        else if (state.scores.them >= 7 && state.scores.them > state.scores.us) txt = "You Lose!";
+        else txt = "Draw!"; // Rare
+        
+        document.getElementById('winner-text').innerText = txt;
+        document.getElementById('final-score-text').innerText = `Final: ${state.scores.us} - ${state.scores.them}`;
+        document.getElementById('game-over-overlay').classList.remove('hidden');
+    } else {
+        // Next Round
+        state.round++;
+        setTimeout(startRound, 2000); // Small delay to see scores?
+        switchTab('score'); // Show score briefly
+        setTimeout(() => { if(state.phase === 'setup') switchTab('play'); }, 4000);
+    }
+}
+
+/**
+ * UI RENDERING
+ */
+function renderHand() {
+    const container = document.getElementById('my-hand-container');
+    container.innerHTML = '';
+    const hand = state.players[0];
+    const legalMoves = state.turn === 0 ? getLegalMoves(hand) : [];
+
+    hand.forEach((card, i) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.dataset.suit = card.suit;
+        div.innerHTML = `${card.rank}<div style="font-size:2rem">${card.suit}</div>`;
+        div.style.left = `${(i * 25) + 20}px`; // Fanned out
+        div.style.zIndex = i;
+        
+        // Interaction
+        if(state.turn === 0) {
+            const isLegal = legalMoves.includes(card);
+            if(!isLegal) div.classList.add('disabled');
+            else {
+                div.onclick = () => {
+                    div.classList.add('selected');
+                    setTimeout(() => playCardAction(card), 200);
+                };
+            }
+        } else {
+             div.classList.add('disabled');
+        }
+
+        container.appendChild(div);
+    });
+}
+
+function renderTable() {
+    const area = document.getElementById('table-area');
+    area.innerHTML = '';
+    
+    // Positions relative to Human (Bottom)
+    // 0=Bottom, 1=Left, 2=Top, 3=Right
+    const positions = ['pc-bottom', 'pc-left', 'pc-top', 'pc-right'];
+    
+    state.trickCards.forEach(tc => {
+        const div = document.createElement('div');
+        div.className = `played-card ${positions[tc.id]}`;
+        div.dataset.suit = tc.card.suit;
+        div.innerHTML = `${tc.card.rank}<div>${tc.card.suit}</div>`;
+        area.appendChild(div);
+    });
+}
+
+function updatePlayerInfo(id) {
+    document.getElementById(`bid-${id}`).innerText = `Bid: ${state.bids[id]}`;
+}
+
+function updateAvatarActive() {
+    [0,1,2,3].forEach(i => {
+        const el = document.getElementById(i === 0 ? 'my-hand-container' : `avatar-${i}`);
+        if(i === 0) {
+            if(state.turn === 0) el.style.background = "linear-gradient(to top, rgba(255,255,255,0.1), transparent)";
+            else el.style.background = "transparent";
+        } else {
+            if(state.turn === i) el.classList.add('active-turn');
+            else el.classList.remove('active-turn');
+        }
+    });
+}
+
+function updateScoreboard() {
+    const tbody = document.getElementById('score-body');
+    tbody.innerHTML = '';
+    state.history.forEach(h => {
+        let tr = document.createElement('tr');
+        tr.innerHTML = `<td>${h.round}</td><td>${h.usTricks} (Bid ${h.usBid})</td><td>${h.themTricks} (Bid ${h.themBid})</td>`;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('total-us').innerText = state.scores.us;
+    document.getElementById('total-them').innerText = state.scores.them;
+}
+
+/**
+ * CHAT & UTILS
+ */
+function chat(playerId, msg) {
+    const name = playerId === 1 ? 'Opp B' : (playerId === 2 ? 'Partner' : 'Opp D');
+    addChat(name, msg);
+    
+    // Bubble
+    const bubble = document.getElementById(`bubble-${playerId}`);
+    bubble.innerText = msg;
+    bubble.classList.add('show');
+    setTimeout(() => bubble.classList.remove('show'), 3000);
+}
+
+function addChat(name, msg) {
+    const box = document.getElementById('chat-box');
+    const line = document.createElement('div');
+    line.className = 'chat-line';
+    line.innerHTML = `<span style="color:var(--accent)">${name}:</span> ${msg}`;
+    box.appendChild(line);
+    // Keep last 3
+    if(box.children.length > 3) box.removeChild(box.firstChild);
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    
+    // Find index
+    const tabs = ['play', 'score', 'rules'];
+    document.querySelectorAll('.tab')[tabs.indexOf(tabName)].classList.add('active');
+    document.getElementById(`${tabName}-view`).classList.add('active');
+}
+
+// Start
+init();
+
+</script>
+</body>
+</html>
