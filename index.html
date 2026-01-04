@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spades – Phone Only</title>
+<title>Spades – Working</title>
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -16,75 +16,82 @@ html,body{
   overflow:hidden;
 }
 
-/* Layout */
-#game{
-  display:flex;
-  flex-direction:column;
+/* TABLE */
+#table{
+  position:relative;
+  width:100%;
   height:100%;
 }
 
-#table{
-  flex:1;
-  position:relative;
-}
-
-/* Players */
+/* PLAYERS */
 .player{
   position:absolute;
   text-align:center;
 }
-
-#A{bottom:0;left:0;right:0}
-#C{top:0;left:0;right:0}
-#B{left:0;top:50%;transform:translateY(-50%)}
-#D{right:0;top:50%;transform:translateY(-50%)}
+#C{top:10px;left:0;right:0}
+#A{bottom:10px;left:0;right:0}
+#B{left:5px;top:50%;transform:translateY(-50%)}
+#D{right:5px;top:50%;transform:translateY(-50%)}
 
 .name{
   font-size:.8rem;
   margin-bottom:4px;
 }
 
+/* HAND */
 .hand{
   display:flex;
   justify-content:center;
-  gap:3px;
+  gap:4px;
   flex-wrap:wrap;
 }
 
-/* Cards */
+/* CARD */
 .card,.back{
   width:38px;
   height:54px;
   border-radius:6px;
   background:#fff;
+  border:1px solid #ccc;
   display:flex;
-  justify-content:center;
   align-items:center;
+  justify-content:center;
   font-weight:bold;
   font-size:.8rem;
-  border:1px solid #ccc;
 }
 
-/* Colors */
-.black{color:#000}
 .red{color:#d90429}
-
+.black{color:#000}
 .back{background:#ccc}
 
-/* Bottom bar */
+/* TRICK */
+#trick{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  display:flex;
+  gap:8px;
+}
+
+/* STATUS */
 #status{
+  position:absolute;
+  bottom:70px;
+  left:5px;
+  right:5px;
   background:rgba(0,0,0,.6);
   padding:6px;
   font-size:.8rem;
 }
 
 #chat{
-  height:45px;
+  height:40px;
   overflow:auto;
-  margin-bottom:4px;
 }
 
 button{
+  margin-top:4px;
   padding:6px 10px;
   border:none;
   border-radius:6px;
@@ -93,17 +100,10 @@ button{
 }
 
 input{width:40px}
-
-/* Mobile */
-@media(max-width:480px){
-  .card,.back{width:34px;height:48px}
-}
 </style>
 </head>
 
 <body>
-
-<div id="game">
 
 <div id="table">
 
@@ -127,33 +127,34 @@ input{width:40px}
     <div id="handA" class="hand"></div>
   </div>
 
-</div>
+  <div id="trick"></div>
 
-<div id="status">
-  <div id="chat"></div>
-  <div id="bidArea">
-    Bid:
-    <input id="bid" type="number" min="0" max="13" value="3">
-    <button onclick="submitBid()">OK</button>
+  <div id="status">
+    <div id="chat"></div>
+    <div id="bidArea">
+      Bid:
+      <input id="bid" type="number" min="0" max="13" value="3">
+      <button onclick="startPlay()">OK</button>
+    </div>
   </div>
-</div>
 
 </div>
 
 <script>
-/* ===== DATA ===== */
-const suitOrder = {"♠":1,"♦":2,"♣":3,"♥":4};
-const rankOrder = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+/* DATA */
 const players=["A","B","C","D"];
-const suits=["♠","♥","♦","♣"];
-let hands={},deck=[],phase="BID";
+const suits=["♠","♦","♣","♥"];
+const ranks=["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+const suitOrder={"♠":1,"♦":2,"♣":3,"♥":4};
 
-/* ===== START ===== */
-startGame();
+let hands={},deck=[],turn="A",phase="BID",trick=[];
 
-function startGame(){
+/* START */
+init();
+
+function init(){
   deck=[];
-  suits.forEach(s=>rankOrder.forEach(r=>deck.push(r+s)));
+  suits.forEach(s=>ranks.forEach(r=>deck.push(r+s)));
   deck.sort(()=>Math.random()-0.5);
 
   hands={A:[],B:[],C:[],D:[]};
@@ -164,18 +165,16 @@ function startGame(){
   log("Place your bid");
 }
 
-/* ===== SORT HAND ===== */
+/* SORT */
 function sortHand(hand){
   hand.sort((a,b)=>{
-    const sa=a.slice(-1), sb=b.slice(-1);
-    if(suitOrder[sa]!==suitOrder[sb]){
-      return suitOrder[sa]-suitOrder[sb];
-    }
-    return rankOrder.indexOf(a.slice(0,-1))-rankOrder.indexOf(b.slice(0,-1));
+    if(suitOrder[a.slice(-1)]!==suitOrder[b.slice(-1)])
+      return suitOrder[a.slice(-1)]-suitOrder[b.slice(-1)];
+    return ranks.indexOf(a.slice(0,-1))-ranks.indexOf(b.slice(0,-1));
   });
 }
 
-/* ===== RENDER ===== */
+/* RENDER */
 function render(){
   players.forEach(p=>{
     const el=document.getElementById("hand"+p);
@@ -185,22 +184,66 @@ function render(){
       if(p==="A"){
         d.className="card "+((card.includes("♥")||card.includes("♦"))?"red":"black");
         d.innerText=card;
+        if(phase==="PLAY" && turn==="A"){
+          d.onclick=()=>playCard(card);
+        }
       }else{
         d.className="back";
       }
       el.appendChild(d);
     });
   });
+
+  const t=document.getElementById("trick");
+  t.innerHTML="";
+  trick.forEach(o=>{
+    const d=document.createElement("div");
+    d.className="card "+((o.card.includes("♥")||o.card.includes("♦"))?"red":"black");
+    d.innerText=o.card;
+    t.appendChild(d);
+  });
 }
 
-/* ===== BID ===== */
-function submitBid(){
+/* BID → PLAY */
+function startPlay(){
   phase="PLAY";
   document.getElementById("bidArea").style.display="none";
   log("Play started");
+  if(turn!=="A") aiTurn();
 }
 
-/* ===== CHAT ===== */
+/* PLAY CARD */
+function playCard(card){
+  if(turn!=="A") return;
+  hands.A=hands.A.filter(c=>c!==card);
+  trick.push({player:"A",card});
+  nextTurn();
+}
+
+/* NEXT TURN */
+function nextTurn(){
+  if(trick.length===4){
+    trick=[];
+    turn="A";
+    render();
+    return;
+  }
+  turn=players[(players.indexOf(turn)+1)%4];
+  render();
+  if(turn!=="A") aiTurn();
+}
+
+/* AI */
+function aiTurn(){
+  setTimeout(()=>{
+    const card=hands[turn].shift();
+    trick.push({player:turn,card});
+    log("Player "+turn+" played");
+    nextTurn();
+  },700);
+}
+
+/* CHAT */
 function log(text){
   const c=document.getElementById("chat");
   c.innerHTML+=text+"<br>";
