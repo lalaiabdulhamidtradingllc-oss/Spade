@@ -1,896 +1,238 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Spades</title>
-    <style>
-        /* --- CORE STYLES --- */
-        :root {
-            --felt-green: #006400;
-            --dark-wood: #4a2c2a;
-            --light-wood: #5a3c3a;
-            --card-bg: #f8f8f8;
-            --card-border: #ccc;
-            --text-light: #fff;
-            --text-dark: #222;
-            --accent-gold: #ffeb3b;
-            --spade-color: #000000;
-            --heart-color: #d90429;
-            --diamond-color: #d90429;
-            --club-color: #000000;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Spades</title>
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+<style>
+:root {
+  --felt-green:#006400;
+  --dark-wood:#4a2c2a;
+  --light-wood:#5a3c3a;
+  --card-bg:#f8f8f8;
+  --card-border:#ccc;
+  --text-light:#fff;
+  --text-dark:#222;
+  --accent-gold:#ffeb3b;
+}
 
-        html, body {
-            width: 100%;
-            height: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--felt-green);
-            color: var(--text-light);
-            overflow: hidden; /* Prevents scrolling */
-        }
+/* RESET */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  width:100%;
+  height:100%;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+  background:var(--felt-green);
+  color:white;
+  overflow:hidden;
+}
 
-        .game-container {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        /* --- TABS --- */
-        .tabs {
-            display: flex;
-            background-color: var(--dark-wood);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            flex-shrink: 0;
-        }
+.game-container{
+  height:100%;
+  display:flex;
+  flex-direction:column;
+}
 
-        .tab-button {
-            flex: 1;
-            padding: 12px 5px;
-            background: none;
-            border: none;
-            color: var(--text-light);
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-        }
+/* TABS */
+.tabs{
+  display:flex;
+  background:var(--dark-wood);
+}
+.tab-button{
+  flex:1;
+  padding:10px;
+  background:none;
+  border:none;
+  color:white;
+  font-weight:bold;
+}
+.tab-button.active{
+  background:var(--light-wood);
+  border-bottom:3px solid var(--accent-gold);
+}
+.tab-content{display:none;flex:1;padding:8px;overflow:auto}
+.tab-content.active{display:block}
 
-        .tab-button.active {
-            background-color: var(--light-wood);
-            border-bottom-color: var(--accent-gold);
-        }
+/* PLAY AREA */
+#play-area{position:relative;height:100%}
 
-        .tab-content {
-            flex-grow: 1;
-            padding: 10px;
-            display: none; /* Hidden by default */
-            overflow-y: auto;
-        }
+.player-area{
+  position:absolute;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
 
-        .tab-content.active {
-            display: block;
-        }
-        
-        /* --- PLAY TAB & GAME BOARD --- */
-        #play-area {
-            height: 100%;
-            position: relative;
-        }
+#player-area-A{bottom:0;width:100%}
+#player-area-C{top:0;width:100%}
+#player-area-B{left:0;top:50%;transform:translateY(-50%)}
+#player-area-D{right:0;top:50%;transform:translateY(-50%)}
 
-        .player-area {
-            position: absolute;
-            width: 50%;
-            height: 100px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
+.player-info{
+  background:rgba(0,0,0,.5);
+  padding:4px 8px;
+  border-radius:6px;
+  font-size:.8rem;
+  margin-bottom:4px;
+}
 
-        #player-area-A { /* South - Human */
-            bottom: 0; left: 50%;
-            transform: translateX(-50%);
-            width: 100%;
-            height: auto;
-        }
-        #player-area-C { /* North - Partner */
-            top: 0; left: 50%;
-            transform: translateX(-50%);
-        }
-        #player-area-B { /* West - Opponent */
-            top: 50%; left: 0;
-            transform: translateY(-50%);
-            width: 100px; height: 50%;
-        }
-        #player-area-D { /* East - Opponent */
-            top: 50%; right: 0;
-            transform: translateY(-50%);
-            width: 100px; height: 50%;
-        }
+.hand{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}
 
-        .player-info {
-            font-weight: bold;
-            background-color: rgba(0,0,0,0.4);
-            padding: 2px 8px;
-            border-radius: 5px;
-            margin-bottom: 5px;
-            text-align: center;
-        }
-        
-        .player-info.current-turn {
-            background-color: var(--accent-gold);
-            color: var(--text-dark);
-        }
+.card,.card-back{
+  width:38px;
+  height:54px;
+  border-radius:6px;
+  background:#f8f8f8;
+  color:#000;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-weight:bold;
+  border:1px solid #ccc;
+}
 
-        .hand {
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            gap: 2px;
-        }
-        
-        #player-area-A .hand {
-            flex-wrap: wrap;
-        }
-        
-        #player-area-B .hand, #player-area-D .hand {
-            flex-direction: column;
-            gap: 5px;
-        }
+.card-back{
+  background:#ccc;
+}
 
-        .card, .card-back {
-            width: 50px;
-            height: 70px;
-            border: 1px solid var(--card-border);
-            border-radius: 5px;
-            background-color: var(--card-bg);
-            color: var(--text-dark);
-            font-weight: bold;
-            position: relative;
-            cursor: pointer;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-        }
+#trick-area{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  display:flex;
+  gap:6px;
+}
 
-        .card-back {
-            background-image: linear-gradient(45deg, #bbb 25%, transparent 25%), linear-gradient(-45deg, #bbb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #bbb 75%), linear-gradient(-45deg, transparent 75%, #bbb 75%);
-            background-size: 10px 10px;
-            background-color: #ccc;
-        }
-        
-        #player-area-A .card:hover {
-            transform: translateY(-10px);
-            box-shadow: 2px 2px 8px rgba(0,0,0,0.4);
-        }
+#game-status-area{
+  position:absolute;
+  bottom:70px;
+  left:6px;
+  right:6px;
+  background:rgba(0,0,0,.7);
+  padding:6px;
+  border-radius:8px;
+  font-size:.8rem;
+}
 
-        .card span { position: absolute; }
-        .card .rank { top: 4px; left: 5px; font-size: 1.1rem; }
-        .card .suit { bottom: 4px; right: 5px; font-size: 1rem; }
-        .card.S, .card.C { color: var(--spade-color); }
-        .card.H, .card.D { color: var(--heart-color); }
-        
-        /* Trick and Status Areas */
-        #trick-area {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            display: flex;
-            gap: 10px;
-            width: 240px;
-            height: 100px;
-            justify-content: center;
-            align-items: center;
-        }
+#chat-log{
+  height:45px;
+  overflow:auto;
+  font-size:.75rem;
+  margin-bottom:4px;
+}
 
-        #trick-area .card {
-            width: 60px; height: 84px;
-        }
+button{
+  background:var(--dark-wood);
+  color:white;
+  border:none;
+  padding:6px 8px;
+  border-radius:6px;
+  font-size:.85rem;
+}
 
-        #game-status-area {
-            position: absolute;
-            bottom: 110px;
-            left: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.6);
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-            z-index: 10;
-        }
+#bid-input{width:40px}
 
-        #chat-log {
-            font-size: 0.9rem;
-            height: 60px;
-            overflow-y: auto;
-            margin-bottom: 10px;
-            border: 1px solid var(--light-wood);
-            padding: 5px;
-        }
-        #chat-log p { margin-bottom: 4px; }
+#game-over-screen{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.85);
+  display:none;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
+}
 
-        #bid-area, #round-summary {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-        }
+/* SCORE & RULES */
+#score-table,#rules-content{
+  background:var(--light-wood);
+  padding:12px;
+  border-radius:10px;
+}
 
-        #bid-input { width: 50px; }
-        button {
-            padding: 8px 12px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 5px;
-            border: none;
-            background-color: var(--dark-wood);
-            color: var(--text-light);
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
-        }
-        button:hover { background-color: var(--light-wood); }
-
-        #game-over-screen {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-        }
-        #game-over-screen h2 { font-size: 2rem; margin-bottom: 20px; }
-
-
-        /* --- SCORE & RULES TAB --- */
-        #score-table, #rules-content {
-            background-color: var(--light-wood);
-            padding: 15px;
-            border-radius: 8px;
-            margin: auto;
-            max-width: 500px;
-        }
-        #score-table h3 { text-align: center; margin-bottom: 15px; border-bottom: 1px solid var(--felt-green); padding-bottom: 10px;}
-        .score-row {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            text-align: center;
-            font-size: 1.1rem;
-            margin-bottom: 15px;
-        }
-        .score-row .score-number { font-size: 1.8rem; font-weight: bold; color: var(--accent-gold); }
-        #round-history { margin-top: 20px; }
-        #round-history h4 { text-align: center; margin-bottom: 10px; }
-        #round-history div { display: grid; grid-template-columns: 1fr repeat(3, 0.5fr); gap: 5px; padding: 5px; text-align: center; }
-        #round-history div:nth-child(odd) { background: rgba(0,0,0,0.1); }
-        
-        #rules-content h3 { margin-bottom: 15px; }
-        #rules-content p, #rules-content ul { margin-bottom: 10px; }
-        #rules-content li { margin-left: 20px; }
-
-    </style>
+/* MOBILE EXTRA SAFE */
+@media(max-width:480px){
+  .card,.card-back{width:34px;height:48px}
+  #trick-area .card{width:40px;height:56px}
+  #player-area-B,#player-area-D{width:60px}
+}
+</style>
 </head>
+
 <body>
 
-    <div class="game-container">
-        <!-- TABS -->
-        <nav class="tabs">
-            <button class="tab-button active" onclick="switchTab('play')">Play</button>
-            <button class="tab-button" onclick="switchTab('score')">Score</button>
-            <button class="tab-button" onclick="switchTab('rules')">Rules</button>
-        </nav>
+<div class="game-container">
 
-        <!-- CONTENT AREA -->
-        <main id="main-content">
-            <!-- PLAY TAB -->
-            <div id="play" class="tab-content active">
-                <div id="play-area">
-                    <!-- Player Areas -->
-                    <div id="player-area-A" class="player-area">
-                        <div id="player-A-info" class="player-info">Player A (You)</div>
-                        <div id="player-A-hand" class="hand"></div>
-                    </div>
-                    <div id="player-area-B" class="player-area">
-                        <div id="player-B-info" class="player-info">Player B</div>
-                        <div id="player-B-hand" class="hand"></div>
-                    </div>
-                    <div id="player-area-C" class="player-area">
-                        <div id="player-C-info" class="player-info">Player C (Partner)</div>
-                        <div id="player-C-hand" class="hand"></div>
-                    </div>
-                    <div id="player-area-D" class="player-area">
-                        <div id="player-D-info" class="player-info">Player D</div>
-                        <div id="player-D-hand" class="hand"></div>
-                    </div>
-                    
-                    <!-- Trick Area -->
-                    <div id="trick-area"></div>
-                    
-                    <!-- Game Status -->
-                    <div id="game-status-area">
-                        <div id="chat-log"></div>
-                        <div id="bid-area">
-                            <label for="bid-input">Your Bid:</label>
-                            <input type="number" id="bid-input" min="0" max="13" value="1">
-                            <button id="submit-bid-btn">Submit Bid</button>
-                        </div>
-                        <div id="round-summary" style="display: none;">
-                            <button id="next-round-btn">Next Round</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Game Over Screen -->
-                    <div id="game-over-screen" style="display: none;">
-                        <h2 id="game-over-message"></h2>
-                        <button id="new-game-btn">New Game</button>
-                    </div>
+<nav class="tabs">
+  <button class="tab-button active" onclick="switchTab('play')">Play</button>
+  <button class="tab-button" onclick="switchTab('score')">Score</button>
+  <button class="tab-button" onclick="switchTab('rules')">Rules</button>
+</nav>
 
-                </div>
-            </div>
+<main>
 
-            <!-- SCORE TAB -->
-            <div id="score" class="tab-content">
-                <div id="score-table">
-                     <h3>Score (First to 7 Wins)</h3>
-                     <div class="score-row">
-                        <div>
-                            <h4>Your Team (A+C)</h4>
-                            <p class="score-number" id="team-AC-score">0</p>
-                        </div>
-                        <div>
-                           <h4>Opponents (B+D)</h4>
-                           <p class="score-number" id="team-BD-score">0</p>
-                        </div>
-                     </div>
-                     <div id="round-history">
-                        <h4>Round History</h4>
-                        <div class="history-header"><b>Team</b><b>Bid</b><b>Took</b><b>Score</b></div>
-                     </div>
-                </div>
-            </div>
+<div id="play" class="tab-content active">
+  <div id="play-area">
 
-            <!-- RULES TAB -->
-            <div id="rules" class="tab-content">
-                <div id="rules-content">
-                    <h3>Game Rules</h3>
-                    <ul>
-                        <li><strong>Winning:</strong> The first team to score 7 points wins the game.</li>
-                        <li><strong>Extra-Tricks-Only Scoring:</strong> You ONLY score points for tricks taken *above* your team's combined bid (the "baseline"). Tricks that meet the baseline are worth 0 points. Failing to meet the baseline is also 0 points. Each extra trick ("overtrick") is +1 point.</li>
-                        <li><strong>The Declare Rule:</strong> After your team bids, the opponents (AI Players B & D) can challenge it. They might say, "We declare you will make Y." This new number Y becomes your baseline for the round. You cannot reject it. This prevents you from bidding low on purpose just to get extra tricks.</li>
-                        <li><strong>No Nil / No Blind:</strong> Bidding 0 is allowed, but it is not a special "Nil" bid. It just means you bid 0. There are no blind bids.</li>
-                        <li><strong>Relaxed Spades:</strong> Spades are always trump. You can lead a spade at any time, even if spades have not been "broken" yet.</li>
-                        <li><strong>Standard Play:</strong> You must follow the suit that was led if you are able to. If you cannot, you may play any card, including a spade. The highest spade wins the trick; otherwise, the highest card of the suit led wins.</li>
-                    </ul>
-                </div>
-            </div>
-        </main>
+    <div id="player-area-A" class="player-area">
+      <div class="player-info">You</div>
+      <div class="hand"></div>
     </div>
 
+    <div id="player-area-B" class="player-area">
+      <div class="player-info">B</div>
+      <div class="hand"></div>
+    </div>
+
+    <div id="player-area-C" class="player-area">
+      <div class="player-info">Partner</div>
+      <div class="hand"></div>
+    </div>
+
+    <div id="player-area-D" class="player-area">
+      <div class="player-info">D</div>
+      <div class="hand"></div>
+    </div>
+
+    <div id="trick-area"></div>
+
+    <div id="game-status-area">
+      <div id="chat-log"></div>
+      <div>
+        Bid:
+        <input id="bid-input" type="number" min="0" max="13" value="1">
+        <button>Submit</button>
+      </div>
+    </div>
+
+    <div id="game-over-screen">
+      <h2>You Win</h2>
+      <button onclick="location.reload()">New Game</button>
+    </div>
+
+  </div>
+</div>
+
+<div id="score" class="tab-content">
+  <div id="score-table">Score screen</div>
+</div>
+
+<div id="rules" class="tab-content">
+  <div id="rules-content">Rules screen</div>
+</div>
+
+</main>
+</div>
+
 <script>
-// --- DOM ELEMENTS ---
-const dom = {
-    tabs: document.querySelectorAll('.tab-button'),
-    tabContents: document.querySelectorAll('.tab-content'),
-    playArea: document.getElementById('play-area'),
-    playerHands: {
-        A: document.getElementById('player-A-hand'),
-        B: document.getElementById('player-B-hand'),
-        C: document.getElementById('player-C-hand'),
-        D: document.getElementById('player-D-hand'),
-    },
-    playerInfos: {
-        A: document.getElementById('player-A-info'),
-        B: document.getElementById('player-B-info'),
-        C: document.getElementById('player-C-info'),
-        D: document.getElementById('player-D-info'),
-    },
-    trickArea: document.getElementById('trick-area'),
-    chatLog: document.getElementById('chat-log'),
-    bidArea: document.getElementById('bid-area'),
-    bidInput: document.getElementById('bid-input'),
-    submitBidBtn: document.getElementById('submit-bid-btn'),
-    roundSummary: document.getElementById('round-summary'),
-    nextRoundBtn: document.getElementById('next-round-btn'),
-    gameOverScreen: document.getElementById('game-over-screen'),
-    gameOverMessage: document.getElementById('game-over-message'),
-    newGameBtn: document.getElementById('new-game-btn'),
-    teamACScore: document.getElementById('team-AC-score'),
-    teamBDScore: document.getElementById('team-BD-score'),
-    roundHistory: document.getElementById('round-history'),
-};
-
-// --- GAME CONSTANTS ---
-const SUITS = ['S', 'H', 'D', 'C'];
-const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-const RANK_VALUES = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
-const PLAYERS = ['A', 'B', 'C', 'D'];
-const WINNING_SCORE = 7;
-
-// --- GAME STATE ---
-let state = {};
-
-function initState() {
-    state = {
-        phase: 'INIT', // INIT, BIDDING, PLAYING, SCORING, GAMEOVER
-        scores: { AC: 0, BD: 0 },
-        roundHistory: [],
-        playerTurn: 'A',
-        leadPlayer: 'A',
-        roundNum: 0,
-        // Round-specific state
-        deck: [],
-        hands: { A: [], B: [], C: [], D: [] },
-        bids: { A: null, B: null, C: null, D: null },
-        baseline: 0,
-        tricksTaken: { AC: 0, BD: 0 },
-        currentTrick: [],
-        suitLed: null,
-        suspicion: 0,
-    };
+function switchTab(tab){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'))
+  document.querySelectorAll('.tab-button').forEach(b=>b.classList.remove('active'))
+  document.getElementById(tab).classList.add('active')
+  event.target.classList.add('active')
 }
-
-// --- RENDER & UI FUNCTIONS ---
-
-function switchTab(tabName) {
-    dom.tabContents.forEach(tc => tc.classList.remove('active'));
-    dom.tabs.forEach(tb => tb.classList.remove('active'));
-    document.getElementById(tabName).classList.add('active');
-    document.querySelector(`.tab-button[onclick="switchTab('${tabName}')"]`).classList.add('active');
-}
-
-function render() {
-    // Render hands
-    for (const player of PLAYERS) {
-        const handEl = dom.playerHands[player];
-        handEl.innerHTML = '';
-        const hand = state.hands[player] || [];
-        
-        if (player === 'A') {
-            hand.sort((a,b) => sortCards(a,b));
-            hand.forEach(card => handEl.appendChild(createCardElement(card, 'A')));
-        } else {
-            hand.forEach(() => handEl.appendChild(createCardElement(null, player)));
-        }
-    }
-    
-    // Render trick area
-    dom.trickArea.innerHTML = '';
-    state.currentTrick.forEach(playedCard => {
-        dom.trickArea.appendChild(createCardElement(playedCard.card, playedCard.player));
-    });
-
-    // Update player turn indicator
-    document.querySelectorAll('.player-info').forEach(el => el.classList.remove('current-turn'));
-    if (state.phase === 'PLAYING' && state.playerTurn) {
-        dom.playerInfos[state.playerTurn].classList.add('current-turn');
-    }
-    
-    // Show/hide UI elements based on phase
-    dom.bidArea.style.display = state.phase === 'BIDDING' && state.playerTurn === 'A' ? 'flex' : 'none';
-    dom.roundSummary.style.display = state.phase === 'SCORING' ? 'flex' : 'none';
-    dom.gameOverScreen.style.display = state.phase === 'GAMEOVER' ? 'flex' : 'none';
-}
-
-function createCardElement(card, player) {
-    const cardEl = document.createElement('div');
-    if (!card || player !== 'A' && state.phase !== 'SCORING') {
-        cardEl.className = 'card-back';
-        return cardEl;
-    }
-    
-    cardEl.className = `card ${card.suit}`;
-    cardEl.dataset.card = `${card.rank}${card.suit}`;
-    
-    const rankEl = document.createElement('span');
-    rankEl.className = 'rank';
-    rankEl.textContent = card.rank;
-    
-    const suitEl = document.createElement('span');
-    suitEl.className = 'suit';
-    suitEl.innerHTML = getSuitSymbol(card.suit);
-    
-    cardEl.appendChild(rankEl);
-    cardEl.appendChild(suitEl);
-
-    if (player === 'A') {
-        cardEl.addEventListener('click', () => handleHumanPlay(card));
-    }
-
-    return cardEl;
-}
-
-function getSuitSymbol(suit) {
-    return { S: '♠', H: '♥', D: '♦', C: '♣' }[suit];
-}
-
-function updateChat(player, message) {
-    const p = document.createElement('p');
-    p.innerHTML = `<strong>${player}:</strong> ${message}`;
-    dom.chatLog.appendChild(p);
-    dom.chatLog.scrollTop = dom.chatLog.scrollHeight;
-}
-
-function updateScoreboard() {
-    dom.teamACScore.textContent = state.scores.AC;
-    dom.teamBDScore.textContent = state.scores.BD;
-    
-    const header = dom.roundHistory.querySelector('.history-header');
-    dom.roundHistory.innerHTML = '';
-    dom.roundHistory.appendChild(header);
-
-    state.roundHistory.forEach(r => {
-        const teamRow = document.createElement('div');
-        teamRow.innerHTML = `<span>${r.team}</span><span>${r.bid}</span><span>${r.took}</span><span>${r.score}</span>`;
-        dom.roundHistory.appendChild(teamRow);
-    });
-}
-
-
-// --- GAME FLOW & LOGIC ---
-
-function newGame() {
-    initState();
-    updateChat('System', 'A new game has started. First to 7 points wins.');
-    startRound();
-    updateScoreboard();
-}
-
-function startRound() {
-    state.roundNum++;
-    state.phase = 'BIDDING';
-    state.deck = createDeck();
-    shuffleDeck(state.deck);
-    dealCards();
-
-    // Reset round state
-    state.bids = { A: null, B: null, C: null, D: null };
-    state.baseline = 0;
-    state.tricksTaken = { AC: 0, BD: 0 };
-    state.currentTrick = [];
-    state.playerTurn = 'A'; // Bidding starts with Player A
-    state.leadPlayer = 'A'; // Player A leads the first trick
-    
-    dom.chatLog.innerHTML = '';
-    updateChat('System', `--- Round ${state.roundNum} ---`);
-    updateChat('System', 'Bidding has started. Please place your bid.');
-    
-    render();
-}
-
-function createDeck() {
-    const deck = [];
-    for (const suit of SUITS) {
-        for (const rank of RANKS) {
-            deck.push({ rank, suit });
-        }
-    }
-    return deck;
-}
-
-function shuffleDeck(deck) {
-    for (let i = deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-}
-
-function dealCards() {
-    let playerIndex = 0;
-    state.hands = { A: [], B: [], C: [], D: [] };
-    state.deck.forEach(card => {
-        const player = PLAYERS[playerIndex];
-        state.hands[player].push(card);
-        playerIndex = (playerIndex + 1) % 4;
-    });
-}
-
-function handleHumanBid() {
-    const bidValue = parseInt(dom.bidInput.value);
-    if (isNaN(bidValue) || bidValue < 0 || bidValue > 13) {
-        updateChat('System', 'Invalid bid. Please enter a number between 0 and 13.');
-        return;
-    }
-    state.bids.A = bidValue;
-    updateChat('Player A', `I bid ${bidValue}.`);
-    
-    // AI bidding sequence
-    setTimeout(aiBidSequence, 500);
-}
-
-function aiBidSequence() {
-    // Partner bids
-    state.bids.C = getAIBid(state.hands.C, state.bids.A);
-    updateChat('Player C', `I bid ${state.bids.C}.`);
-    
-    // Calculate baseline
-    state.baseline = state.bids.A + state.bids.C;
-    updateChat('System', `Your team's baseline is ${state.baseline}.`);
-    
-    // Opponents declare or accept
-    setTimeout(opponentDeclare, 1000);
-}
-
-function opponentDeclare() {
-    const opponentHandStrength = getHandStrength(state.hands.B) + getHandStrength(state.hands.D);
-    
-    // Suspicion logic
-    state.suspicion = (state.suspicion / 2); // Decay old suspicion
-    if (state.baseline < 4) state.suspicion += 0.2;
-    if (state.baseline < 3) state.suspicion += 0.2;
-    if (opponentHandStrength < 5) state.suspicion += 0.15;
-    
-    if (state.suspicion >= 0.65) {
-        let declareAmount = state.baseline + 1;
-        if (state.suspicion > 0.85) declareAmount++;
-        declareAmount = Math.min(declareAmount, 13);
-        
-        state.baseline = declareAmount;
-        updateChat('Player D', `Give me your cards. We declare you will make ${state.baseline}.`);
-        state.suspicion = 0; // Reset after declaring
-    } else {
-        updateChat('Player B', `We accept your bid of ${state.bids.A + state.bids.C}.`);
-    }
-    
-    // Move to playing phase
-    state.phase = 'PLAYING';
-    state.playerTurn = state.leadPlayer; // First trick leader
-    updateChat('System', 'Play has started. It is Player A\'s turn to lead.');
-    render();
-
-    if (state.playerTurn !== 'A') {
-        setTimeout(runAITurn, 1000);
-    }
-}
-
-function handleHumanPlay(card) {
-    if (state.phase !== 'PLAYING' || state.playerTurn !== 'A') return;
-
-    if (isValidMove('A', card)) {
-        playCard('A', card);
-    } else {
-        updateChat('System', 'Invalid move. You must follow suit if possible.');
-    }
-}
-
-function playCard(player, card) {
-    // Remove card from hand
-    state.hands[player] = state.hands[player].filter(c => c.rank !== card.rank || c.suit !== card.suit);
-    
-    // Add to trick
-    state.currentTrick.push({ player, card });
-    
-    if (state.currentTrick.length === 1) {
-        state.suitLed = card.suit;
-    }
-    
-    // Move to next player
-    const playerIndex = PLAYERS.indexOf(player);
-    state.playerTurn = PLAYERS[(playerIndex + 1) % 4];
-    
-    render();
-    
-    // If trick is complete, evaluate. Otherwise, next player's turn.
-    if (state.currentTrick.length === 4) {
-        setTimeout(evaluateTrick, 1500);
-    } else if (state.playerTurn !== 'A') {
-        setTimeout(runAITurn, 1000);
-    }
-}
-
-function evaluateTrick() {
-    let winningCard = state.currentTrick[0].card;
-    let winner = state.currentTrick[0].player;
-    
-    for (let i = 1; i < 4; i++) {
-        const currentPlay = state.currentTrick[i];
-        const currentCard = currentPlay.card;
-
-        if (currentCard.suit === winningCard.suit && RANK_VALUES[currentCard.rank] > RANK_VALUES[winningCard.rank]) {
-            winningCard = currentCard;
-            winner = currentPlay.player;
-        } else if (currentCard.suit === 'S' && winningCard.suit !== 'S') {
-            winningCard = currentCard;
-            winner = currentPlay.player;
-        }
-    }
-    
-    // Update tricks taken
-    const winningTeam = (winner === 'A' || winner === 'C') ? 'AC' : 'BD';
-    state.tricksTaken[winningTeam]++;
-    
-    updateChat('System', `Player ${winner} wins the trick with the ${winningCard.rank} of ${getSuitSymbol(winningCard.suit)}.`);
-    
-    state.leadPlayer = winner;
-    state.playerTurn = winner;
-    state.currentTrick = [];
-    state.suitLed = null;
-    
-    // Check if round is over
-    if (state.hands.A.length === 0) {
-        setTimeout(scoreRound, 1000);
-    } else {
-        render();
-        if (state.playerTurn !== 'A') {
-            setTimeout(runAITurn, 1000);
-        }
-    }
-}
-
-function scoreRound() {
-    state.phase = 'SCORING';
-    const teamAC_Took = state.tricksTaken.AC;
-    const teamBD_Took = state.tricksTaken.BD;
-    
-    // Our team's score
-    const extraTricksAC = teamAC_Took - state.baseline;
-    let scoreAC = 0;
-    if (extraTricksAC > 0) {
-        scoreAC = extraTricksAC;
-        state.suspicion += (extraTricksAC * 0.15); // Increase suspicion for next round
-    } else if (extraTricksAC < 0) {
-        state.suspicion = Math.max(0, state.suspicion - 0.2); // Lower suspicion
-    }
-    state.scores.AC += scoreAC;
-
-    // Opponent team's score (no bidding for them, just score overtricks on a default bid)
-    // For simplicity, let's say they implicitly bid what they took. Extras are rare.
-    // In this ruleset, opponents effectively can't score. Let's make it 0 for them.
-    let scoreBD = 0; 
-    state.scores.BD += scoreBD;
-    
-    state.roundHistory.push({ team: 'You', bid: state.baseline, took: teamAC_Took, score: `+${scoreAC}` });
-    state.roundHistory.push({ team: 'Opp', bid: '-', took: teamBD_Took, score: `+${scoreBD}` });
-
-    updateChat('System', `Round Over! Your Team (${teamAC_Took}/${state.baseline}), Opponents (${teamBD_Took}/13). You scored ${scoreAC} points.`);
-    updateScoreboard();
-    
-    if (state.scores.AC >= WINNING_SCORE || state.scores.BD >= WINNING_SCORE) {
-        state.phase = 'GAMEOVER';
-        const message = state.scores.AC >= WINNING_SCORE ? 'You Win!' : 'You Lose!';
-        dom.gameOverMessage.textContent = message;
-    }
-    
-    render();
-}
-
-
-// --- AI LOGIC ---
-
-function getAIBid(hand, partnerBid) {
-    let bid = 0;
-    
-    const suitsInHand = { S: 0, H: 0, D: 0, C: 0 };
-    hand.forEach(c => suitsInHand[c.suit]++);
-
-    // Voids and Singletons
-    if (suitsInHand.H === 0 || suitsInHand.D === 0 || suitsInHand.C === 0) bid += 0.8;
-    if (suitsInHand.H === 1 || suitsInHand.D === 1 || suitsInHand.C === 1) bid += 0.5;
-
-    for (const card of hand) {
-        if (card.suit === 'S') {
-            if (['A', 'K', 'Q'].includes(card.rank)) bid += 1;
-            else if (['J', '10'].includes(card.rank)) bid += 0.6;
-            else bid += 0.3;
-        } else { // Non-spades
-            if (card.rank === 'A') bid += 0.9;
-            if (card.rank === 'K' && suitsInHand[card.suit] >= 2) bid += 0.5;
-            if (card.rank === 'Q' && suitsInHand[card.suit] >= 3) bid += 0.3;
-        }
-    }
-    
-    let roundedBid = Math.round(bid);
-    
-    // Adjust based on partner
-    if (partnerBid >= 5 && roundedBid > 1) roundedBid -= 1;
-    if (partnerBid <= 1 && roundedBid < 5) roundedBid += 1;
-    
-    return Math.max(0, Math.min(13, roundedBid));
-}
-
-function getHandStrength(hand) {
-    let strength = 0;
-    for (const card of hand) {
-        if (card.suit === 'S') strength += (RANK_VALUES[card.rank] / 10);
-        if (['A', 'K'].includes(card.rank)) strength += 0.5;
-    }
-    return strength;
-}
-
-function runAITurn() {
-    if (state.phase !== 'PLAYING' || state.playerTurn === 'A') return;
-
-    const player = state.playerTurn;
-    const cardToPlay = getAICardToPlay(player, state.hands[player]);
-    
-    setTimeout(() => {
-        playCard(player, cardToPlay);
-    }, 1000);
-}
-
-function getAICardToPlay(player, hand) {
-    const validMoves = hand.filter(card => isValidMove(player, card));
-    validMoves.sort((a,b) => sortCards(a,b)); // Sort low to high
-
-    const partner = player === 'C' ? 'A' : (player === 'B' ? 'D' : 'B');
-    const isPartnerTeam = (p) => (p === 'A' || p === 'C') ? (player === 'A' || player === 'C') : (p === 'B' || p === 'D');
-    
-    // If leading a trick
-    if (state.currentTrick.length === 0) {
-        // Simple logic: lead with a high non-spade, or a low spade if that's all is left
-        const nonSpades = validMoves.filter(c => c.suit !== 'S').sort((a,b)=>RANK_VALUES[b.rank] - RANK_VALUES[a.rank]);
-        if (nonSpades.length > 0) return nonSpades[0];
-        return validMoves[validMoves.length-1]; // Highest spade
-    }
-    
-    // Determine current winning card of trick
-    let winningPlay = state.currentTrick[0];
-    for(let i = 1; i < state.currentTrick.length; i++) {
-        const currentPlay = state.currentTrick[i];
-        if ( (currentPlay.card.suit === winningPlay.card.suit && RANK_VALUES[currentPlay.card.rank] > RANK_VALUES[winningPlay.card.rank]) ||
-             (currentPlay.card.suit === 'S' && winningPlay.card.suit !== 'S') ) {
-            winningPlay = currentPlay;
-        }
-    }
-    
-    const partnerIsWinning = isPartnerTeam(winningPlay.player);
-
-    // If partner is winning, slough off (play lowest card)
-    if (partnerIsWinning) {
-        return validMoves[0]; // Lowest valid card
-    }
-
-    // Try to win the trick
-    const winningCards = validMoves.filter(c => 
-        (c.suit === winningPlay.card.suit && RANK_VALUES[c.rank] > RANK_VALUES[winningPlay.card.rank]) ||
-        (c.suit === 'S' && winningPlay.card.suit !== 'S')
-    );
-    
-    if (winningCards.length > 0) {
-        // Play smallest card that can win
-        winningCards.sort((a,b) => sortCards(a,b));
-        return winningCards[0];
-    }
-    
-    // Cannot win, so play lowest card possible
-    return validMoves[0];
-}
-
-function isValidMove(player, card) {
-    const hand = state.hands[player];
-    if (!state.suitLed) return true; // Can lead anything
-    
-    const hasSuitLed = hand.some(c => c.suit === state.suitLed);
-    if (hasSuitLed) {
-        return card.suit === state.suitLed;
-    }
-    return true; // Can play anything if void in suit led
-}
-
-function sortCards(a, b) {
-    // Sort by suit first (Spades last), then by rank
-    const suitOrder = { 'C': 1, 'D': 2, 'H': 3, 'S': 4 };
-    if (suitOrder[a.suit] !== suitOrder[b.suit]) {
-        return suitOrder[a.suit] - suitOrder[b.suit];
-    }
-    return RANK_VALUES[a.rank] - RANK_VALUES[b.rank];
-}
-
-// --- EVENT LISTENERS ---
-dom.submitBidBtn.addEventListener('click', handleHumanBid);
-dom.nextRoundBtn.addEventListener('click', startRound);
-dom.newGameBtn.addEventListener('click', newGame);
-
-// --- INITIALIZE ---
-window.onload = newGame;
-
 </script>
+
 </body>
 </html>
