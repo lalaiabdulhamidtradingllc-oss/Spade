@@ -3,249 +3,183 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spades – iPhone Stable</title>
+<title>Spades – Canvas Version</title>
 
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
 html,body{
-  width:100%;
-  height:100%;
+  margin:0;
+  padding:0;
   background:#0b5a2a;
-  font-family:-apple-system,BlinkMacSystemFont,Segoe UI;
-  color:#fff;
   overflow:hidden;
 }
-
-/* TABLE */
-#table{
-  position:relative;
-  width:100%;
-  height:100%;
+canvas{
+  display:block;
 }
-
-/* PLAYERS */
-.player{
-  position:absolute;
-  text-align:center;
-  width:100%;
-}
-
-#playerC{top:10px}
-#playerA{bottom:10px}
-#playerB{left:0;top:50%;width:70px;transform:translateY(-50%)}
-#playerD{right:0;top:50%;width:70px;transform:translateY(-50%)}
-
-.name{
-  font-size:.8rem;
-  margin-bottom:4px;
-}
-
-/* HANDS */
-.hand{
-  display:flex;
-  justify-content:center;
-  gap:4px;
-  flex-wrap:nowrap;   /* IMPORTANT: no wrap */
-  overflow:hidden;
-}
-
-#playerB .hand,
-#playerD .hand{
-  flex-direction:column;
-}
-
-/* CARDS */
-.card,.back{
-  width:36px;
-  height:50px;
-  border-radius:6px;
-  background:#fff;
-  border:1px solid #ccc;
-  font-weight:bold;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:.8rem;
-}
-
-.red{color:#d90429}
-.black{color:#000}
-.back{background:#ccc}
-
-/* TRICK */
-#trick{
-  position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  display:flex;
-  gap:10px;
-}
-
-/* STATUS */
-#status{
-  position:absolute;
-  bottom:80px;
+#ui{
+  position:fixed;
+  bottom:10px;
   left:10px;
   right:10px;
-  background:rgba(0,0,0,.65);
+  color:white;
+  font-family:-apple-system,BlinkMacSystemFont,Segoe UI;
+}
+button,input{
   padding:6px;
-  font-size:.8rem;
+  font-size:14px;
 }
-
-#chat{
-  height:38px;
-  overflow:auto;
-}
-
-button{
-  padding:6px 10px;
-  border:none;
-  border-radius:6px;
-  background:#3e2a20;
-  color:#fff;
-}
-
-input{width:42px}
 </style>
 </head>
 
 <body>
 
-<div id="table">
+<canvas id="game"></canvas>
 
-  <div id="playerC" class="player">
-    <div class="name">PARTNER</div>
-    <div id="handC" class="hand"></div>
-  </div>
-
-  <div id="playerB" class="player">
-    <div class="name">B</div>
-    <div id="handB" class="hand"></div>
-  </div>
-
-  <div id="playerD" class="player">
-    <div class="name">D</div>
-    <div id="handD" class="hand"></div>
-  </div>
-
-  <div id="playerA" class="player">
-    <div class="name">YOU</div>
-    <div id="handA" class="hand"></div>
-  </div>
-
-  <div id="trick"></div>
-
-  <div id="status">
-    <div id="chat"></div>
-    <div id="bidArea">
-      Bid:
-      <input id="bid" type="number" min="0" max="13" value="3">
-      <button onclick="startPlay()">OK</button>
-    </div>
-  </div>
-
+<div id="ui">
+  <div id="msg">Place your bid</div>
+  Bid:
+  <input id="bid" type="number" min="0" max="13" value="3">
+  <button onclick="startPlay()">OK</button>
 </div>
 
 <script>
-const players=["A","B","C","D"];
-const suits=["♠","♦","♣","♥"];
-const ranks=["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
-const suitOrder={"♠":1,"♦":2,"♣":3,"♥":4};
+/* ===== CANVAS SETUP ===== */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-let hands={},deck=[],turn="A",phase="BID",trick=[];
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  draw();
+}
+window.addEventListener("resize", resize);
+resize();
 
-/* INIT */
-init();
+/* ===== GAME DATA ===== */
+const suits = ["♠","♦","♣","♥"];
+const suitColor = s => (s==="♥"||s==="♦") ? "red" : "black";
+const ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+const suitOrder = {"♠":1,"♦":2,"♣":3,"♥":4};
+const players = ["A","B","C","D"];
 
+let deck = [];
+let hands = {A:[],B:[],C:[],D:[]};
+let phase = "BID";
+let turn = "A";
+let trick = [];
+
+/* ===== INIT ===== */
 function init(){
   deck=[];
-  suits.forEach(s=>ranks.forEach(r=>deck.push(r+s)));
+  suits.forEach(s=>ranks.forEach(r=>deck.push({r,s})));
   deck.sort(()=>Math.random()-0.5);
 
   hands={A:[],B:[],C:[],D:[]};
   deck.forEach((c,i)=>hands[players[i%4]].push(c));
-  sortHand(hands.A);
-  render();
-  log("Place your bid");
+
+  hands.A.sort(sortCard);
+  draw();
+}
+init();
+
+/* ===== SORT ===== */
+function sortCard(a,b){
+  if(suitOrder[a.s]!==suitOrder[b.s]) return suitOrder[a.s]-suitOrder[b.s];
+  return ranks.indexOf(a.r)-ranks.indexOf(b.r);
 }
 
-function sortHand(hand){
-  hand.sort((a,b)=>{
-    if(suitOrder[a.slice(-1)]!==suitOrder[b.slice(-1)])
-      return suitOrder[a.slice(-1)]-suitOrder[b.slice(-1)];
-    return ranks.indexOf(a.slice(0,-1))-ranks.indexOf(b.slice(0,-1));
+/* ===== DRAW ===== */
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  drawHand("C", canvas.width/2, 40, false);
+  drawHand("A", canvas.width/2, canvas.height-90, true);
+  drawHand("B", 40, canvas.height/2, false, true);
+  drawHand("D", canvas.width-40, canvas.height/2, false, true);
+
+  drawTrick();
+}
+
+/* ===== DRAW HAND ===== */
+function drawHand(p, x, y, faceUp, vertical=false){
+  const cards = hands[p];
+  const gap = 40;
+
+  cards.forEach((c,i)=>{
+    let cx = vertical ? x : x + (i-cards.length/2)*gap;
+    let cy = vertical ? y + (i-cards.length/2)*gap : y;
+    drawCard(cx,cy,c,faceUp);
+    c._x=cx; c._y=cy;
   });
 }
 
-function render(){
-  players.forEach(p=>{
-    const el=document.getElementById("hand"+p);
-    el.innerHTML="";
-    hands[p].forEach(card=>{
-      const d=document.createElement("div");
-      if(p==="A"){
-        d.className="card "+((card.includes("♥")||card.includes("♦"))?"red":"black");
-        d.innerText=card;
-        if(phase==="PLAY" && turn==="A"){
-          d.onclick=()=>playCard(card);
-        }
-      }else{
-        d.className="back";
-      }
-      el.appendChild(d);
-    });
-  });
+/* ===== DRAW CARD ===== */
+function drawCard(x,y,c,face){
+  ctx.fillStyle="#fff";
+  ctx.fillRect(x-18,y-25,36,50);
+  ctx.strokeRect(x-18,y-25,36,50);
 
-  const t=document.getElementById("trick");
-  t.innerHTML="";
-  trick.forEach(c=>{
-    const d=document.createElement("div");
-    d.className="card "+((c.includes("♥")||c.includes("♦"))?"red":"black");
-    d.innerText=c;
-    t.appendChild(d);
+  if(face){
+    ctx.fillStyle=suitColor(c.s);
+    ctx.font="14px Arial";
+    ctx.fillText(c.r+c.s,x-14,y-5);
+  }
+}
+
+/* ===== TRICK ===== */
+function drawTrick(){
+  trick.forEach((t,i)=>{
+    drawCard(canvas.width/2+(i-1.5)*45,canvas.height/2,t,true);
   });
 }
 
+/* ===== INPUT ===== */
+canvas.addEventListener("touchstart",e=>{
+  if(phase!=="PLAY"||turn!=="A") return;
+  const t=e.touches[0];
+  const x=t.clientX, y=t.clientY;
+
+  for(let i=0;i<hands.A.length;i++){
+    const c=hands.A[i];
+    if(x>c._x-18&&x<c._x+18&&y>c._y-25&&y<c._y+25){
+      playCard("A",i);
+      break;
+    }
+  }
+});
+
+/* ===== START PLAY ===== */
 function startPlay(){
   phase="PLAY";
-  document.getElementById("bidArea").style.display="none";
-  log("Play started – your turn");
+  document.getElementById("msg").innerText="Play started – your turn";
 }
 
-function playCard(card){
-  if(turn!=="A")return;
-  hands.A=hands.A.filter(c=>c!==card);
-  trick.push(card);
-  turn="B";
-  render();
-  aiPlay();
+/* ===== PLAY CARD ===== */
+function playCard(p,index){
+  const c=hands[p].splice(index,1)[0];
+  trick.push(c);
+  nextTurn();
 }
 
-function aiPlay(){
-  setTimeout(()=>{
-    const card=hands[turn].shift();
-    trick.push(card);
-    nextTurn();
-  },600);
-}
-
+/* ===== TURN ===== */
 function nextTurn(){
   if(trick.length===4){
     trick=[];
     turn="A";
-    render();
+    draw();
     return;
   }
   turn=players[(players.indexOf(turn)+1)%4];
-  render();
   if(turn!=="A") aiPlay();
+  draw();
 }
 
-function log(text){
-  const c=document.getElementById("chat");
-  c.innerHTML+=text+"<br>";
-  c.scrollTop=c.scrollHeight;
+/* ===== AI ===== */
+function aiPlay(){
+  setTimeout(()=>{
+    const c=hands[turn].shift();
+    trick.push(c);
+    nextTurn();
+  },500);
 }
 </script>
 
