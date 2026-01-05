@@ -1,30 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spades – Canvas Version</title>
+<title>Card Game – Fresh Start</title>
 
 <style>
 html,body{
   margin:0;
   padding:0;
-  background:#0b5a2a;
-  overflow:hidden;
+  height:100%;
+  background:linear-gradient(180deg,#0f172a,#020617);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+  color:white;
 }
-canvas{
-  display:block;
+
+/* TABLE */
+#table{
+  position:relative;
+  width:100%;
+  height:100%;
 }
-#ui{
+
+/* PLAYERS */
+.player{
+  position:absolute;
+  text-align:center;
+  font-size:14px;
+  opacity:.9;
+}
+
+#top{top:20px;left:50%;transform:translateX(-50%)}
+#bottom{bottom:20px;left:50%;transform:translateX(-50%)}
+#left{left:20px;top:50%;transform:translateY(-50%)}
+#right{right:20px;top:50%;transform:translateY(-50%)}
+
+/* HAND */
+.hand{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  margin-top:10px;
+}
+
+/* CARD */
+.card{
+  width:52px;
+  height:72px;
+  border-radius:10px;
+  background:white;
+  color:black;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:600;
+  box-shadow:0 4px 10px rgba(0,0,0,.4);
+}
+
+/* CLICK EFFECT */
+.card:active{
+  transform:scale(.95);
+}
+
+/* INFO BAR */
+#info{
   position:fixed;
   bottom:10px;
-  left:10px;
-  right:10px;
-  color:white;
-  font-family:-apple-system,BlinkMacSystemFont,Segoe UI;
-}
-button,input{
-  padding:6px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,.5);
+  padding:10px 20px;
+  border-radius:20px;
   font-size:14px;
 }
 </style>
@@ -32,154 +78,50 @@ button,input{
 
 <body>
 
-<canvas id="game"></canvas>
+<div id="table">
 
-<div id="ui">
-  <div id="msg">Place your bid</div>
-  Bid:
-  <input id="bid" type="number" min="0" max="13" value="3">
-  <button onclick="startPlay()">OK</button>
+  <div id="top" class="player">
+    TOP PLAYER
+    <div class="hand">
+      <div class="card">🂠</div>
+      <div class="card">🂠</div>
+      <div class="card">🂠</div>
+    </div>
+  </div>
+
+  <div id="left" class="player">
+    LEFT
+    <div class="hand">
+      <div class="card">🂠</div>
+      <div class="card">🂠</div>
+    </div>
+  </div>
+
+  <div id="right" class="player">
+    RIGHT
+    <div class="hand">
+      <div class="card">🂠</div>
+      <div class="card">🂠</div>
+    </div>
+  </div>
+
+  <div id="bottom" class="player">
+    YOU
+    <div class="hand">
+      <div class="card" onclick="tap()">A♠</div>
+      <div class="card" onclick="tap()">10♥</div>
+      <div class="card" onclick="tap()">K♦</div>
+      <div class="card" onclick="tap()">3♣</div>
+    </div>
+  </div>
+
 </div>
 
+<div id="info">Tap a card</div>
+
 <script>
-/* ===== CANVAS SETUP ===== */
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-
-function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  draw();
-}
-window.addEventListener("resize", resize);
-resize();
-
-/* ===== GAME DATA ===== */
-const suits = ["♠","♦","♣","♥"];
-const suitColor = s => (s==="♥"||s==="♦") ? "red" : "black";
-const ranks = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
-const suitOrder = {"♠":1,"♦":2,"♣":3,"♥":4};
-const players = ["A","B","C","D"];
-
-let deck = [];
-let hands = {A:[],B:[],C:[],D:[]};
-let phase = "BID";
-let turn = "A";
-let trick = [];
-
-/* ===== INIT ===== */
-function init(){
-  deck=[];
-  suits.forEach(s=>ranks.forEach(r=>deck.push({r,s})));
-  deck.sort(()=>Math.random()-0.5);
-
-  hands={A:[],B:[],C:[],D:[]};
-  deck.forEach((c,i)=>hands[players[i%4]].push(c));
-
-  hands.A.sort(sortCard);
-  draw();
-}
-init();
-
-/* ===== SORT ===== */
-function sortCard(a,b){
-  if(suitOrder[a.s]!==suitOrder[b.s]) return suitOrder[a.s]-suitOrder[b.s];
-  return ranks.indexOf(a.r)-ranks.indexOf(b.r);
-}
-
-/* ===== DRAW ===== */
-function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  drawHand("C", canvas.width/2, 40, false);
-  drawHand("A", canvas.width/2, canvas.height-90, true);
-  drawHand("B", 40, canvas.height/2, false, true);
-  drawHand("D", canvas.width-40, canvas.height/2, false, true);
-
-  drawTrick();
-}
-
-/* ===== DRAW HAND ===== */
-function drawHand(p, x, y, faceUp, vertical=false){
-  const cards = hands[p];
-  const gap = 40;
-
-  cards.forEach((c,i)=>{
-    let cx = vertical ? x : x + (i-cards.length/2)*gap;
-    let cy = vertical ? y + (i-cards.length/2)*gap : y;
-    drawCard(cx,cy,c,faceUp);
-    c._x=cx; c._y=cy;
-  });
-}
-
-/* ===== DRAW CARD ===== */
-function drawCard(x,y,c,face){
-  ctx.fillStyle="#fff";
-  ctx.fillRect(x-18,y-25,36,50);
-  ctx.strokeRect(x-18,y-25,36,50);
-
-  if(face){
-    ctx.fillStyle=suitColor(c.s);
-    ctx.font="14px Arial";
-    ctx.fillText(c.r+c.s,x-14,y-5);
-  }
-}
-
-/* ===== TRICK ===== */
-function drawTrick(){
-  trick.forEach((t,i)=>{
-    drawCard(canvas.width/2+(i-1.5)*45,canvas.height/2,t,true);
-  });
-}
-
-/* ===== INPUT ===== */
-canvas.addEventListener("touchstart",e=>{
-  if(phase!=="PLAY"||turn!=="A") return;
-  const t=e.touches[0];
-  const x=t.clientX, y=t.clientY;
-
-  for(let i=0;i<hands.A.length;i++){
-    const c=hands.A[i];
-    if(x>c._x-18&&x<c._x+18&&y>c._y-25&&y<c._y+25){
-      playCard("A",i);
-      break;
-    }
-  }
-});
-
-/* ===== START PLAY ===== */
-function startPlay(){
-  phase="PLAY";
-  document.getElementById("msg").innerText="Play started – your turn";
-}
-
-/* ===== PLAY CARD ===== */
-function playCard(p,index){
-  const c=hands[p].splice(index,1)[0];
-  trick.push(c);
-  nextTurn();
-}
-
-/* ===== TURN ===== */
-function nextTurn(){
-  if(trick.length===4){
-    trick=[];
-    turn="A";
-    draw();
-    return;
-  }
-  turn=players[(players.indexOf(turn)+1)%4];
-  if(turn!=="A") aiPlay();
-  draw();
-}
-
-/* ===== AI ===== */
-function aiPlay(){
-  setTimeout(()=>{
-    const c=hands[turn].shift();
-    trick.push(c);
-    nextTurn();
-  },500);
+function tap(){
+  document.getElementById("info").innerText = "Tap works ✅";
 }
 </script>
 
