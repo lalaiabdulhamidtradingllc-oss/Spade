@@ -346,13 +346,20 @@
     }
 
     function sortHand(hand) {
-        // Sort by Suit then Rank
-        const suitOrder = { '♠': 4, '♥': 3, '♣': 2, '♦': 1 };
-        hand.sort((a,b) => {
-            if (suitOrder[a.suit] !== suitOrder[b.suit]) 
-                return suitOrder[b.suit] - suitOrder[a.suit];
-            return b.rank - a.rank;
-        });
+    // Check if Diamonds exist
+    const hasDiamond = hand.some(c => c.suit === '♦');
+
+    // Dynamic suit order
+    const suitOrder = hasDiamond
+        ? { '♠': 4, '♦': 3, '♣': 2, '♥': 1 }   // ♠ ♦ ♣ ♥
+        : { '♠': 3, '♣': 2, '♥': 1 };          // ♠ ♣ ♥
+
+    hand.sort((a, b) => {
+        if (suitOrder[a.suit] !== suitOrder[b.suit]) {
+            return suitOrder[b.suit] - suitOrder[a.suit];
+        }
+        return b.rank - a.rank;
+    });
     }
 
     // --- Bidding ---
