@@ -635,9 +635,8 @@
     }
 
     function calculateScore(taken, bid) {
-        if (taken < bid) return - (bid * 10);
-        let bags = taken - bid;
-        return (bid * 10) + bags; // Simplified scoring (no bags penalty logic for brevity)
+    if (taken <= bid) return 0;   // no extra tricks → no points
+    return taken - bid;
     }
 
     // Start
